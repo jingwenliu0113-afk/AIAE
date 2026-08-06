@@ -1,0 +1,17 @@
+name: ml-learning
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - plotly
+  - xgboost
+  - jupyterlab
+  - notebook
+  # PyCharm 2026.1 does not yet handle IPykernel 7.2+'s iopub_welcome message.
+  - ipykernel<7
