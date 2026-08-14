@@ -1,0 +1,356 @@
+"""BrickGPT inference with syntax-constrained decoding.
+
+BrickGPT is published as a LoRA adapter over ``meta-llama/Llama-3.2-1B-Instruct``
+(gated -- the base model needs an accepted licence and ``hf auth login``).
+
+The brick grammar is enforced during decoding: at each step only the tokens
+that can legally continue the current brick are considered, and the sample is
+drawn from that short list rather than from a masked full vocabulary.  The
+reference implementation masks logits too, but calls ``generate`` afresh for
+every token; this keeps one KV cache across the whole structure.
+
+Every brick is exactly ten tokens::
+
+    <dim> x <dim> ' (' <pos> , <pos> , <pos> ')\\n'
+
+which holds because each dimension (1-8), each coordinate (0-19) and each
+literal is a single token in this tokenizer -- verified in
+``tests/test_decoding.py``.  EOS is only offered at slot 0, so a brick can never
+be cut in half.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from dataclasses import dataclass, field
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from src.data.bricks import WORLD, Brick, parse_bricks
+from src.generation.prompt import INSTRUCTION, build_prompt
+
+# Model identities and pinned revisions come from src.model_ids, shared with
+# the training path. Defining them here as well is how arms A/B/D and C/E would
+# drift onto different base weights while each side looked internally correct.
+from src.model_ids import (  # noqa: E402
+    ADAPTER,
+    ADAPTER_REVISION,
+    BASE_MODEL,
+    BASE_REVISION,
+    LOCAL_ADAPTER_MANIFEST as _LOCAL_ADAPTER_MANIFEST,
+    TOKENIZER,
+    TOKENIZER_REVISION,
+)
+
+MAX_DIM = 8
+TOKENS_PER_BRICK = 10
+
+# Re-exported so callers keep importing them from here; the definitions live
+# in src.generation.prompt so training data and inference cannot drift apart.
+__all__ = ["INSTRUCTION", "build_prompt", "BrickGPT", "BrickGate", "Slots",
+           "TOKENS_PER_BRICK", "sample", "parse_output", "Generation"]
+
+
+def _refuse_locally_trained_adapter(adapter: str) -> None:
+    """Stop a locally trained adapter from being applied to bare Llama.
+
+    Our adapters are fitted on top of the *merged* BrickGPT weights. This
+    constructor stacks an adapter straight onto ``base``, which for such a
+    checkpoint silently produces a wrong model -- it loads, it generates, and
+    only the numbers look off. Detected by the manifest the trainer writes.
+    """
+    import os
+
+    if os.path.isdir(adapter) and os.path.exists(
+        os.path.join(adapter, _LOCAL_ADAPTER_MANIFEST)
+    ):
+        raise ValueError(
+            f"{adapter} is a locally trained adapter fitted on top of the "
+            "merged BrickGPT weights. BrickGPT(adapter=...) would apply it to "
+            "the bare base model instead, which fails silently. Use "
+            "src.training.lora.load_finetuned() for these checkpoints."
+        )
+
+
+def load_tokenizer(name: str = TOKENIZER, revision: str | None = TOKENIZER_REVISION):
+    """Resolve the tokenizer, failing fast and legibly when offline.
+
+    With ``HF_HUB_OFFLINE=1`` and a cold cache the hub raises after its own
+    retry and fallback logic, and the message is about connection errors rather
+    than about the one thing the caller can act on: this needs a cached
+    tokenizer. Offline runs are the normal way this project's tests execute, so
+    the cheap check happens first and the error says what to do.
+    """
+    offline = os.environ.get("HF_HUB_OFFLINE", "") not in ("", "0")
+    try:
+        return AutoTokenizer.from_pretrained(name, revision=revision)
+    except Exception as e:
+        if offline:
+            raise OSError(
+                f"tokenizer {name!r} @ {revision or 'main'} is not in the local "
+                "cache and HF_HUB_OFFLINE=1 forbids fetching it. Run once with "
+                "HF_HUB_OFFLINE unset to populate ~/.cache/huggingface, or pass "
+                "a local tokenizer directory."
+            ) from e
+        raise
+
+
+@dataclass
+class Slots:
+    """Token ids allowed at each of the ten slots of a brick line."""
+
+    dims: list[int]
+    posns: list[int]
+    literal_x: int
+    literal_open: int
+    literal_comma: int
+    literal_close: int
+    eos: int
+
+    @classmethod
+    def build(cls, tok) -> "Slots":
+        def one(s: str) -> int:
+            ids = tok.encode(s, add_special_tokens=False)
+            if len(ids) != 1:
+                raise ValueError(f"{s!r} is not a single token ({len(ids)})")
+            return ids[0]
+
+        return cls(
+            dims=[one(str(i)) for i in range(1, MAX_DIM + 1)],
+            posns=[one(str(i)) for i in range(WORLD)],
+            literal_x=one("x"),
+            literal_open=one(" ("),
+            literal_comma=one(","),
+            literal_close=one(")\n"),
+            eos=tok.eos_token_id,
+        )
+
+    def allowed(self, slot: int) -> list[int]:
+        match slot:
+            case 0:
+                return self.dims + [self.eos]
+            case 1:
+                return [self.literal_x]
+            case 2:
+                return self.dims
+            case 3:
+                return [self.literal_open]
+            case 4 | 6 | 8:
+                return self.posns
+            case 5 | 7:
+                return [self.literal_comma]
+            case 9:
+                return [self.literal_close]
+        raise ValueError(slot)
+
+
+def sample(logits: torch.Tensor, allowed: list[int], temperature: float) -> int:
+    """Sample one token from ``allowed`` only.
+
+    Restricting first and normalising over the ~20 survivors, rather than
+    masking a 128k-wide row and sampling from that, is a correctness
+    requirement and not an optimisation: on the measured configuration,
+    ``torch.multinomial`` on MPS draws outside the support of a sparse
+    distribution a small but non-zero fraction of the time, while CPU is exact.
+    At ten tokens a brick that is enough to corrupt a large share of
+    generations. The draw itself runs on CPU. Current rates, and the exact
+    environment they apply to, are in scripts/06_mps_multinomial_repro.py.
+    """
+    sub = logits[allowed].float() / max(temperature, 1e-6)
+    probs = torch.softmax(sub, dim=-1).cpu()
+    return allowed[int(torch.multinomial(probs, 1).item())]
+
+
+class BrickGate:
+    """Decides which tokens may follow, one slot at a time.
+
+    Subclasses add semantics on top of the grammar; ``on_brick`` fires once a
+    brick's ten tokens are complete.
+    """
+
+    #: Termination reasons, per the workflow definition.
+    STOP_REASONS = ("normal_eos", "inventory_exhausted", "max_bricks", "max_tokens")
+
+    def __init__(self, slots: Slots):
+        self.slots = slots
+        self.stop_reason = "running"
+
+    def allowed(self, slot: int, out: list[int]) -> list[int]:
+        """Legal token ids at ``slot``; ``out`` is everything generated so far."""
+        return self.slots.allowed(slot)
+
+    def on_brick(self, h: int, w: int) -> None:
+        """Called once a brick's ten tokens are complete."""
+        return None
+
+
+@dataclass
+class Generation:
+    text: str
+    bricks: list[Brick]
+    n_tokens: int
+    seconds: float
+    truncated: bool
+    unparsed: list[str] = field(default_factory=list)
+
+
+class BrickGPT:
+    def __init__(
+        self,
+        *,
+        device: str | None = None,
+        dtype: torch.dtype = torch.bfloat16,
+        adapter: str | None = ADAPTER,
+        base: str = BASE_MODEL,
+        base_revision: str | None = BASE_REVISION,
+        adapter_revision: str | None = ADAPTER_REVISION,
+        tokenizer: str = TOKENIZER,
+        tokenizer_revision: str | None = TOKENIZER_REVISION,
+    ):
+        """Three sources, three revisions, pinned independently.
+
+        ``base``/``base_revision`` must match what the training path loads, or
+        arms A/B/D and C/E sit on different weights and every comparison
+        between them measures that too. Both sides take the value from
+        :mod:`src.model_ids`.
+
+        ``adapter``/``adapter_revision`` and ``tokenizer``/``tokenizer_revision``
+        are independent on purpose. A local checkpoint directory is a valid
+        adapter but carries no tokenizer files and has no revision to pin, so
+        it is passed as ``adapter=<path>, adapter_revision=None`` while the
+        tokenizer keeps resolving from the pinned published repo.
+        """
+        if device is None:
+            device = (
+                "mps" if torch.backends.mps.is_available()
+                else "cuda" if torch.cuda.is_available()
+                else "cpu"
+            )
+        self.device = device
+        self.tokenizer = load_tokenizer(tokenizer, tokenizer_revision)
+        model = AutoModelForCausalLM.from_pretrained(
+            base, revision=base_revision, dtype=dtype)
+        if adapter:
+            _refuse_locally_trained_adapter(adapter)
+            from peft import PeftModel
+
+            model = PeftModel.from_pretrained(
+                model, adapter, revision=adapter_revision)
+        self.model = model.to(device).eval()
+        self.slots = Slots.build(self.tokenizer)
+
+    def encode(
+        self, caption: str, inventory: dict[str, int] | None = None
+    ) -> torch.Tensor:
+        """Tokenise the prompt. With ``inventory`` this is the B-E prompt, and
+        it is byte-identical to what the training data contains."""
+        enc = self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": build_prompt(caption, inventory)}],
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
+        )
+        return enc["input_ids"].to(self.device)
+
+    def generate(
+        self,
+        caption: str,
+        *,
+        inventory: dict[str, int] | None = None,
+        max_bricks: int = 120,
+        max_tokens: int | None = None,
+        temperature: float = 0.6,
+        seed: int | None = None,
+        gate: BrickGate | None = None,
+    ) -> Generation:
+        """Decode under ``gate``, one token at a time with a KV cache.
+
+        Written as an explicit loop rather than ``model.generate`` with a
+        ``LogitsProcessor``: the framework path samples from the full masked
+        vocabulary, which is not reliable on MPS (see :func:`sample`), and the
+        loop is also what the per-brick rejection layer will hook into.
+        """
+        import time
+
+        if seed is not None:
+            torch.manual_seed(seed)
+        gate = gate or BrickGate(self.slots)
+
+        ids = self.encode(caption, inventory)
+        eos = self.slots.eos
+        dim_value = {tid: i + 1 for i, tid in enumerate(self.slots.dims)}
+
+        brick_budget = max_bricks * TOKENS_PER_BRICK
+        budget = brick_budget if max_tokens is None else min(brick_budget, max_tokens)
+
+        out: list[int] = []
+        cur = ids
+        past = None
+        t = time.time()
+
+        with torch.no_grad():
+            for step in range(budget):
+                res = self.model(input_ids=cur, past_key_values=past, use_cache=True)
+                past = res.past_key_values
+                logits = res.logits[0, -1, :]
+
+                slot = step % TOKENS_PER_BRICK
+                allowed = gate.allowed(slot, out)
+                tok = sample(logits, allowed, temperature)
+                out.append(tok)
+                if tok == eos:
+                    if gate.stop_reason == "running":
+                        gate.stop_reason = "normal_eos"
+                    break
+                # Account the brick as soon as its tenth token lands, not at
+                # the next slot 0: hitting the token budget mid-structure used
+                # to leave the final brick unbilled, so accepted/used and the
+                # parsed output disagreed by one.
+                if slot == TOKENS_PER_BRICK - 1:
+                    gate.on_brick(dim_value[out[-TOKENS_PER_BRICK]],
+                                  dim_value[out[-TOKENS_PER_BRICK + 2]])
+                cur = torch.tensor([[tok]], device=self.device)
+
+        seconds = time.time() - t
+        if gate.stop_reason == "running":
+            # Which ceiling was hit matters: max_bricks means the structure
+            # budget ran out, max_tokens that a raw token cap cut it short.
+            gate.stop_reason = (
+                "max_bricks" if budget == brick_budget else "max_tokens"
+            )
+
+        text = self.tokenizer.decode(out, skip_special_tokens=True)
+        bricks, unparsed = parse_output(text)
+        return Generation(
+            text=text,
+            bricks=bricks,
+            n_tokens=len(out),
+            seconds=seconds,
+            truncated=len(out) >= budget,
+            unparsed=unparsed,
+        )
+
+
+_BRICK_RE = re.compile(r"\d+x\d+\s*\(\d+,\d+,\d+\)")
+
+
+def parse_output(text: str) -> tuple[list[Brick], list[str]]:
+    """Salvage every well-formed brick line; report the rest.
+
+    Unconstrained baselines emit prose and malformed lines, and the parse rate
+    is itself a reported metric, so failures are collected rather than raised.
+    """
+    bricks: list[Brick] = []
+    unparsed: list[str] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = _BRICK_RE.fullmatch(line)
+        if m:
+            bricks.extend(parse_bricks(line, strict=False))
+        else:
+            unparsed.append(line)
+    return bricks, unparsed

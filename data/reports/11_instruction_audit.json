@@ -1,0 +1,56 @@
+{
+  "stats": {
+    "train": {
+      "rows": 9584,
+      "targets_using_a_rotated_spelling": 9456,
+      "rows_retokenised": 9584,
+      "removal": {
+        "source_samples": 9600,
+        "missing_per_arm": {
+          "inv": 16,
+          "noinv": 16
+        },
+        "pairs_touched_by_removal": 2,
+        "instruction_rows_removed_total": 32,
+        "over_budget_rows_in_removed_pairs": {
+          "5c154f03-b0e7-475d-80c5-b136a10a6546:0": 2,
+          "cdcc6092-b1f7-405d-9777-69e59c6d8451:0": 2
+        },
+        "removal_sound": true
+      }
+    },
+    "val": {
+      "rows": 1600,
+      "targets_using_a_rotated_spelling": 1576,
+      "rows_retokenised": 1600,
+      "removal": {
+        "source_samples": 1600,
+        "missing_per_arm": {
+          "inv": 0,
+          "noinv": 0
+        },
+        "pairs_touched_by_removal": 0,
+        "instruction_rows_removed_total": 0,
+        "over_budget_rows_in_removed_pairs": {},
+        "removal_sound": true
+      }
+    },
+    "test": {
+      "rows": 1600,
+      "targets_using_a_rotated_spelling": 1592,
+      "rows_retokenised": 1600,
+      "removal": {
+        "source_samples": 1600,
+        "missing_per_arm": {
+          "inv": 0,
+          "noinv": 0
+        },
+        "pairs_touched_by_removal": 0,
+        "instruction_rows_removed_total": 0,
+        "over_budget_rows_in_removed_pairs": {},
+        "removal_sound": true
+      }
+    }
+  },
+  "failures": []
+}

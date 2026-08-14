@@ -1,0 +1,234 @@
+{
+  "report": {
+    "inv/train": {
+      "rows": 9584,
+      "unique_prompt_target": 9106,
+      "multiplicity": {
+        "1": 8628,
+        "2": 478
+      },
+      "duplicate_groups_spanning_objects": 0,
+      "objects": 1082,
+      "prompt_median": 273,
+      "target_median": 581,
+      "total_median": 858,
+      "total_p95": 1439,
+      "total_max": 2044,
+      "fits": {
+        "1024": 0.7134808013355592,
+        "2048": 1.0,
+        "4096": 1.0
+      },
+      "fits_count": {
+        "1024": 6838,
+        "2048": 9584,
+        "4096": 9584
+      },
+      "over_budget": 0,
+      "dropped_pairs": 2,
+      "path": "data/processed/instruct_inv_train.jsonl",
+      "sha256": "423b1745e99ad36cb12df5cb5f9e33d12cb72b256f5a43f2ee2c7230c2e8aac5"
+    },
+    "inv/val": {
+      "rows": 1600,
+      "unique_prompt_target": 1326,
+      "multiplicity": {
+        "1": 1052,
+        "2": 274
+      },
+      "duplicate_groups_spanning_objects": 0,
+      "objects": 139,
+      "prompt_median": 274,
+      "target_median": 561,
+      "total_median": 837,
+      "total_p95": 1396,
+      "total_max": 1783,
+      "fits": {
+        "1024": 0.7325,
+        "2048": 1.0,
+        "4096": 1.0
+      },
+      "fits_count": {
+        "1024": 1172,
+        "2048": 1600,
+        "4096": 1600
+      },
+      "over_budget": 0,
+      "dropped_pairs": 0,
+      "path": "data/processed/instruct_inv_val.jsonl",
+      "sha256": "5bdf882b4361f3cbd518de5e3af95422699ca636c9436a409fc47ef01965d4c6"
+    },
+    "inv/test": {
+      "rows": 1600,
+      "unique_prompt_target": 1476,
+      "multiplicity": {
+        "1": 1352,
+        "2": 124
+      },
+      "duplicate_groups_spanning_objects": 0,
+      "objects": 174,
+      "prompt_median": 274,
+      "target_median": 601,
+      "total_median": 872,
+      "total_p95": 1424,
+      "total_max": 1648,
+      "fits": {
+        "1024": 0.7,
+        "2048": 1.0,
+        "4096": 1.0
+      },
+      "fits_count": {
+        "1024": 1120,
+        "2048": 1600,
+        "4096": 1600
+      },
+      "over_budget": 0,
+      "dropped_pairs": 0,
+      "path": "data/processed/instruct_inv_test.jsonl",
+      "sha256": "085c6900a328c1ccdb7496ae9af22ffb383038bf8c70af10213a3561a297dbbd"
+    },
+    "noinv/train": {
+      "rows": 9584,
+      "unique_prompt_target": 2270,
+      "multiplicity": {
+        "4": 2144,
+        "8": 126
+      },
+      "duplicate_groups_spanning_objects": 0,
+      "objects": 1082,
+      "prompt_median": 176,
+      "target_median": 581,
+      "total_median": 761,
+      "total_p95": 1344,
+      "total_max": 1944,
+      "fits": {
+        "1024": 0.7971619365609349,
+        "2048": 1.0,
+        "4096": 1.0
+      },
+      "fits_count": {
+        "1024": 7640,
+        "2048": 9584,
+        "4096": 9584
+      },
+      "over_budget": 0,
+      "dropped_pairs": 2,
+      "path": "data/processed/instruct_noinv_train.jsonl",
+      "sha256": "2db0d9740961fd5e85e1811970f2bd620f3e02a200bf3c825bae4996e2a70839"
+    },
+    "noinv/val": {
+      "rows": 1600,
+      "unique_prompt_target": 328,
+      "multiplicity": {
+        "4": 256,
+        "8": 72
+      },
+      "duplicate_groups_spanning_objects": 0,
+      "objects": 139,
+      "prompt_median": 177,
+      "target_median": 561,
+      "total_median": 740,
+      "total_p95": 1303,
+      "total_max": 1683,
+      "fits": {
+        "1024": 0.845,
+        "2048": 1.0,
+        "4096": 1.0
+      },
+      "fits_count": {
+        "1024": 1352,
+        "2048": 1600,
+        "4096": 1600
+      },
+      "over_budget": 0,
+      "dropped_pairs": 0,
+      "path": "data/processed/instruct_noinv_val.jsonl",
+      "sha256": "f8a104ee12f4082e615a2e15f17381708564bddae3af74073c3d194abae206e3"
+    },
+    "noinv/test": {
+      "rows": 1600,
+      "unique_prompt_target": 367,
+      "multiplicity": {
+        "4": 334,
+        "8": 33
+      },
+      "duplicate_groups_spanning_objects": 0,
+      "objects": 174,
+      "prompt_median": 177,
+      "target_median": 601,
+      "total_median": 773,
+      "total_p95": 1329,
+      "total_max": 1548,
+      "fits": {
+        "1024": 0.7825,
+        "2048": 1.0,
+        "4096": 1.0
+      },
+      "fits_count": {
+        "1024": 1252,
+        "2048": 1600,
+        "4096": 1600
+      },
+      "over_budget": 0,
+      "dropped_pairs": 0,
+      "path": "data/processed/instruct_noinv_test.jsonl",
+      "sha256": "5ee28ef30468fe6adef6300bb8834ed65bf83c42355f318e291f21e2c182bc8f"
+    }
+  },
+  "block_cost": {
+    "n": 12784,
+    "min": 58,
+    "median": 100,
+    "p95": 107,
+    "max": 107
+  },
+  "removals": {
+    "train": {
+      "over_budget_trigger_rows": {
+        "inv": 4,
+        "noinv": 0
+      },
+      "pairs_dropped": 2,
+      "source_samples_removed": 16,
+      "instruction_rows_removed_total": 32,
+      "removed_sample_ids": [
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:control:distractor",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:control:exact",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:control:loose",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:control:mixed",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:counterfactual:distractor",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:counterfactual:exact",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:counterfactual:loose",
+        "5c154f03-b0e7-475d-80c5-b136a10a6546:0:counterfactual:mixed",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:control:distractor",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:control:exact",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:control:loose",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:control:mixed",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:counterfactual:distractor",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:counterfactual:exact",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:counterfactual:loose",
+        "cdcc6092-b1f7-405d-9777-69e59c6d8451:0:counterfactual:mixed"
+      ]
+    },
+    "val": {
+      "over_budget_trigger_rows": {
+        "inv": 0,
+        "noinv": 0
+      },
+      "pairs_dropped": 0,
+      "source_samples_removed": 0,
+      "instruction_rows_removed_total": 0,
+      "removed_sample_ids": []
+    },
+    "test": {
+      "over_budget_trigger_rows": {
+        "inv": 0,
+        "noinv": 0
+      },
+      "pairs_dropped": 0,
+      "source_samples_removed": 0,
+      "instruction_rows_removed_total": 0,
+      "removed_sample_ids": []
+    }
+  }
+}

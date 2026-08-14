@@ -1,0 +1,45 @@
+{
+  "env": {
+    "platform": "macOS-26.6.1-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "python": "3.13.9",
+    "torch": "2.13.0",
+    "mps_available": true,
+    "mps_built": true
+  },
+  "masked_row": [
+    {
+      "device": "cpu",
+      "dtype": "torch.bfloat16",
+      "trials": 4000,
+      "outside_support": 0,
+      "rate": 0.0
+    },
+    {
+      "device": "mps",
+      "dtype": "torch.bfloat16",
+      "trials": 4000,
+      "outside_support": 24,
+      "rate": 0.006
+    }
+  ],
+  "restricted": [
+    {
+      "device": "cpu",
+      "dtype": "torch.bfloat16",
+      "trials": 4000,
+      "outside_support": 0,
+      "rate": 0.0,
+      "method": "restricted-then-normalise (CPU draw)"
+    },
+    {
+      "device": "mps",
+      "dtype": "torch.bfloat16",
+      "trials": 4000,
+      "outside_support": 0,
+      "rate": 0.0,
+      "method": "restricted-then-normalise (CPU draw)"
+    }
+  ]
+}

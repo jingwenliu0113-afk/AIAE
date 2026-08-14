@@ -1,12 +1,22 @@
-﻿.idea/
-.vscode/
+.venv/
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
-.venv/
-venv/
+data/raw/
+data/processed/
+artifacts/checkpoints/
+artifacts/renders/
+.DS_Store
+.hf_cache/
+
+# Local credentials and editor state
 .env
 .env.*
-.DS_Store
-.claude/
-.mcp.json
+!.env.example
+.idea/
+.vscode/
+
+# Model artifacts must be reviewed explicitly before redistribution
+*.safetensors
+*.ckpt
+*.pth
+*.pt

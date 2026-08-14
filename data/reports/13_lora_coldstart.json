@@ -1,0 +1,65 @@
+{
+  "checkpoint": "artifacts/checkpoints/lora_smoke",
+  "environment": {
+    "python": "3.13.9",
+    "platform": "macOS-26.6.1-arm64-arm-64bit-Mach-O",
+    "torch": "2.13.0",
+    "transformers": "5.15.0",
+    "peft": "0.20.0",
+    "dtype": "torch.bfloat16",
+    "device": "cpu"
+  },
+  "probe_row": {
+    "sample_id": "9a4ab826-4b2a-4bed-8f66-301d260abb4a:0:control:distractor",
+    "pair_id": "9a4ab826-4b2a-4bed-8f66-301d260abb4a:0",
+    "role": "control",
+    "variant": "distractor",
+    "n_total_tokens": 471,
+    "n_prompt_tokens": 280,
+    "n_supervised_tokens": 191,
+    "truncated": false
+  },
+  "load_order_observed": [
+    "base",
+    "published_adapter",
+    "merge",
+    "local_adapter"
+  ],
+  "load_order_expected": [
+    "base",
+    "published_adapter",
+    "merge",
+    "local_adapter"
+  ],
+  "base_revision_used": "9213176726f574b556790deb65791e0c5aa438b6",
+  "manifest": {
+    "load_order": [
+      "base",
+      "published_adapter",
+      "merge",
+      "local_adapter"
+    ],
+    "base_model": "meta-llama/Llama-3.2-1B-Instruct",
+    "base_revision": "9213176726f574b556790deb65791e0c5aa438b6",
+    "published_adapter": "AvaLovelace/BrickGPT",
+    "published_adapter_revision": "19737def7bfe5950b2a466825ad7c6d74b7eafe3",
+    "tokenizer": "AvaLovelace/BrickGPT",
+    "tokenizer_revision": "19737def7bfe5950b2a466825ad7c6d74b7eafe3",
+    "adapter_sha256": "645cc6d9acf5aebc2301003567f7c0c3e9a6e08861d223117b3a81a3b7cccc69",
+    "lora": {
+      "r": 16,
+      "alpha": 32,
+      "target_modules": [
+        "q_proj",
+        "v_proj"
+      ]
+    },
+    "warning": "This adapter was fitted on top of the MERGED BrickGPT weights. Applying it directly to the base model produces a model that loads and generates and is wrong. Load it with load_finetuned()."
+  },
+  "loss_correct_path": 0.1037,
+  "loss_wrong_path_bare_base_plus_our_adapter": 0.5609,
+  "loss_difference": 0.4572,
+  "brickgpt_refuses_local_adapter": true,
+  "refusal_message": "artifacts/checkpoints/lora_smoke is a locally trained adapter fitted on top of the merged BrickGPT weights. BrickGPT(adapter=...) would apply it to the bare base model instead, which fails silently. Use src.training.lora.load_finetuned() for these checkpoints.",
+  "failures": []
+}

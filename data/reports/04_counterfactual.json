@@ -1,0 +1,164 @@
+{
+  "report": {
+    "train": {
+      "attempted_sources": 8789,
+      "pairs_kept": 1200,
+      "samples": 9600,
+      "pair_yield": 0.13653430424394128,
+      "hit_target": true,
+      "failures": {
+        "control disconnected": 5780,
+        "no distractor pool": 1680,
+        "counterfactual disconnected for all 7 droppable parts": 51,
+        "counterfactual disconnected for all 6 droppable parts": 28,
+        "counterfactual disconnected for all 5 droppable parts": 25,
+        "counterfactual disconnected for all 3 droppable parts": 8,
+        "counterfactual disconnected for all 4 droppable parts": 7,
+        "control retile failed": 6,
+        "counterfactual disconnected for all 2 droppable parts": 3,
+        "counterfactual disconnected for all 1 droppable parts": 1
+      },
+      "dropped_part_distribution": {
+        "1x2": 196,
+        "1x6": 186,
+        "2x2": 186,
+        "2x4": 175,
+        "1x4": 174,
+        "2x6": 172,
+        "1x8": 111
+      },
+      "distractor_extra_type_counts": {
+        "1": 1834,
+        "2": 1406,
+        "3": 1560
+      },
+      "distractor_extra_types": {
+        "2x2": 1596,
+        "1x4": 1548,
+        "1x8": 1544,
+        "1x6": 1426,
+        "1x1": 1200,
+        "2x4": 1174,
+        "2x6": 516,
+        "1x2": 322
+      },
+      "targets": 2400,
+      "fully_supported_targets": 706,
+      "support_rate": 0.2941666666666667,
+      "stud_single_component": 2400,
+      "ground_single_component": 2400,
+      "mean_parts_tried": 1.57,
+      "max_parts_tried": 6,
+      "objects": 1083,
+      "path": "data/processed/counterfactual_train.jsonl",
+      "sha256": "fb3d5c7931e7745d0095f938780255933e6e8dfef1a3ec662c87c14b4514c3bf",
+      "bytes": 19699144
+    },
+    "val": {
+      "attempted_sources": 1515,
+      "pairs_kept": 200,
+      "samples": 1600,
+      "pair_yield": 0.132013201320132,
+      "hit_target": true,
+      "failures": {
+        "control disconnected": 1027,
+        "no distractor pool": 263,
+        "counterfactual disconnected for all 5 droppable parts": 10,
+        "counterfactual disconnected for all 7 droppable parts": 9,
+        "counterfactual disconnected for all 6 droppable parts": 4,
+        "counterfactual disconnected for all 2 droppable parts": 2
+      },
+      "dropped_part_distribution": {
+        "1x4": 33,
+        "2x6": 33,
+        "2x4": 30,
+        "1x8": 27,
+        "1x2": 27,
+        "1x6": 26,
+        "2x2": 24
+      },
+      "distractor_extra_type_counts": {
+        "1": 378,
+        "2": 222,
+        "3": 200
+      },
+      "distractor_extra_types": {
+        "1x1": 260,
+        "2x2": 254,
+        "1x4": 250,
+        "1x8": 218,
+        "1x6": 188,
+        "2x4": 132,
+        "2x6": 64,
+        "1x2": 56
+      },
+      "targets": 400,
+      "fully_supported_targets": 127,
+      "support_rate": 0.3175,
+      "stud_single_component": 400,
+      "ground_single_component": 400,
+      "mean_parts_tried": 1.51,
+      "max_parts_tried": 6,
+      "objects": 139,
+      "path": "data/processed/counterfactual_val.jsonl",
+      "sha256": "0da84b3281006db34213b8fc9342cdb9bcb355a9db23917f74e3840279cfbdd5",
+      "bytes": 3220298
+    },
+    "test": {
+      "attempted_sources": 1473,
+      "pairs_kept": 200,
+      "samples": 1600,
+      "pair_yield": 0.13577732518669383,
+      "hit_target": true,
+      "failures": {
+        "control disconnected": 955,
+        "no distractor pool": 294,
+        "counterfactual disconnected for all 7 droppable parts": 10,
+        "counterfactual disconnected for all 6 droppable parts": 8,
+        "counterfactual disconnected for all 5 droppable parts": 3,
+        "counterfactual disconnected for all 4 droppable parts": 2,
+        "counterfactual disconnected for all 3 droppable parts": 1
+      },
+      "dropped_part_distribution": {
+        "2x6": 37,
+        "1x4": 32,
+        "2x2": 31,
+        "2x4": 31,
+        "1x2": 27,
+        "1x6": 24,
+        "1x8": 18
+      },
+      "distractor_extra_type_counts": {
+        "1": 336,
+        "2": 218,
+        "3": 246
+      },
+      "distractor_extra_types": {
+        "2x2": 274,
+        "1x4": 242,
+        "1x8": 224,
+        "1x6": 218,
+        "1x1": 212,
+        "2x4": 192,
+        "2x6": 76,
+        "1x2": 72
+      },
+      "targets": 400,
+      "fully_supported_targets": 117,
+      "support_rate": 0.2925,
+      "stud_single_component": 400,
+      "ground_single_component": 400,
+      "mean_parts_tried": 1.48,
+      "max_parts_tried": 6,
+      "objects": 174,
+      "path": "data/processed/counterfactual_test.jsonl",
+      "sha256": "917b4386f21c469b8c68248044ae4387e03c43c8bccd66b7b1fc67a53c4bdd62",
+      "bytes": 3316802
+    }
+  },
+  "cross_split_overlap": {
+    "train|val": 0,
+    "test|train": 0,
+    "test|val": 0
+  }
+}
