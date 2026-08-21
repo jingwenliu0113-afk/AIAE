@@ -1,0 +1,1026 @@
+{
+  "schema_version": 9,
+  "kind": "longrun_design_proposal",
+  "status": "DESIGN FINAL; TOOL IMPLEMENTED AND TESTED WITH INJECTED FAKES; EXECUTION LOCKED AND NEVER RUN. 'Implemented' means every path has production code covered by tests -- NOT that it has run against a real model on a real machine. No report 16 session exists on disk.",
+  "document": "data/reports/16_longrun_design.md",
+  "note": "frozen_constants is THE authority: --session-init embeds it verbatim into plan.json, and src/training/longrun.py cross-checks its own module constants against it and refuses to build a plan on any mismatch, so a second set of numbers can never quietly win.",
+  "questions": {
+    "Q1": "Does empty_cache() every 10 rows still control degradation out to 2000 rows?",
+    "Q2": "Do the total cost and share of scheduled clears scale with length?",
+    "Q3": "Which safety stop conditions are needed?"
+  },
+  "data": {
+    "source_file": "data/processed/instruct_inv_train.jsonl",
+    "verified_split_rows": 9584,
+    "verified_complete_pairs": 1198,
+    "verified_distinct_objects": 1082,
+    "rows_per_pair": 8,
+    "rows_per_pair_enforced_by": "src/training/lora.py sample_pairs() raises unless every chosen pair has exactly 8 rows",
+    "pool_pairs": 250,
+    "pool_rows": 2000,
+    "pool_rows_formula": "pool_rows = 8 * pool_pairs = 8 * 250 = 2000 (>= 2000, and <= 9584 available)",
+    "pool_pairs_rationale": [
+      "exactly enough: pool_rows equals the largest k, so no unused remainder",
+      "identical to report 15 exp002 (sample_pairs(n_pairs=250, seed=0) on the same file), so the permutation is the same one and exp002's 200 rows are the first 200 of this order",
+      "far below the 1198-pair ceiling of the split"
+    ],
+    "seed": 0,
+    "permutation": "torch.randperm(pool_rows=2000, generator=Generator().manual_seed(0)) over ROW indices, computed once, then truncated to k",
+    "permutation_unit": "row index, not pair index",
+    "lengths": [
+      500,
+      1000,
+      2000
+    ],
+    "prefix_property": "run_order(500) and run_order(1000) are exact prefixes of run_order(2000)",
+    "forbidden": [
+      "reshuffling per k",
+      "changing pool_pairs per k",
+      "shuffling pair indices instead of row indices"
+    ]
+  },
+  "measurement_intervals": {
+    "window": 20,
+    "secondary_aggregation": 100,
+    "child_memory_record_every_rows": 5,
+    "child_probe_is_foreground": true,
+    "watchdog_poll_seconds": 5.0,
+    "watchdog_poll_max_gap_seconds": 30.0,
+    "watchdog_runs_in_separate_process": true,
+    "interval_clock": "time.monotonic() inside each process; monotonic clocks are NEVER compared across processes, and wall clock is recorded for alignment only, never computed with",
+    "empty_cache_every": 10,
+    "windows_are_derived_from_per_row": true,
+    "per_row_timestamps": [
+      "monotonic",
+      "wall_clock"
+    ],
+    "background_sampling_thread_inside_measured_process": false,
+    "withdrawn_design": "An earlier version required a foreground safety probe every row AND a 30s maximum gap AND no background thread. Those three cannot hold together: a foreground probe can only run between rows, so a 95 s/row row (the old control's measured worst window) makes a 30s ceiling unreachable, and 'a gap over 30s counts as a probe failure' would misfire on legitimately slow rows.",
+    "adopted_design": "Split recording from enforcement. Recording: the child probes in the foreground every 5 rows into memory[]. Enforcement: a separate watchdog process, started by the parent before the child is spawned, polls OS-level numbers every 5.0s and can ask the child to stop. The prohibition on a background thread INSIDE the measured process is unchanged, and its reason -- not perturbing the thing being measured -- is preserved."
+  },
+  "clocks": {
+    "gate_wait": {
+      "process": "parent",
+      "starts": "on entering the gate in --session-next",
+      "ends": "gate passes or times out",
+      "bounded_by": "gate_timeout_seconds = 900",
+      "separate_from_child": true,
+      "note": "happens in the parent, before the child exists; not a segment of the child's timeline"
+    },
+    "process_clock": {
+      "process": "child",
+      "starts": "child process start",
+      "ends": "child process exit",
+      "bounded_by": "process_max_seconds"
+    },
+    "condition_clock": {
+      "process": "child",
+      "starts": "the instant row 1 begins, after model load",
+      "ends": "the last row ends",
+      "bounded_by": "max_seconds",
+      "nested_inside": "process_clock"
+    },
+    "model_load_seconds": "inside process_clock, outside condition_clock; teardown likewise",
+    "nesting_invariant": "model_load_seconds + condition_clock_seconds <= process_clock_seconds",
+    "removed_field": "non_overlapping: true was wrong -- condition_clock is a sub-interval of process_clock, not a disjoint sibling"
+  },
+  "primary_metric": {
+    "name": "D100",
+    "definition": "mean(seconds_per_row over final 100 rows) / mean(seconds_per_row over first 100 rows)",
+    "basis": "model_compute_seconds per row, from the stored per_row array",
+    "note": "D100 is the single primary metric, but the Q1 verdict is NOT D100 alone -- see verdicts.Q1_run"
+  },
+  "secondary_metrics": {
+    "D20": "last 20-row window / first 20-row window (same shape as reports 14 and 15)",
+    "Dmax": "max over all 20-row windows / mean(first 100 rows)"
+  },
+  "safety_policy": {
+    "priority": "protect the machine first; letting any arm finish is NOT a goal",
+    "acknowledged_asymmetry": "identical thresholds can still produce condition-correlated stops, because the continuous arm is the one that drives memory (at 200 rows: driver 54.4 GB, swap 8.36 GB, pressure 7 %free). This is a property of the condition, not a bias in the rule, and cannot be removed by tuning thresholds. A stopped run is simply not a complete arm.",
+    "withdrawn_rationale": "the earlier justification 'chosen so they do not selectively terminate the control arm' put measurement convenience ahead of machine safety and is withdrawn",
+    "identical_across_conditions": true,
+    "thresholds": {
+      "swap_used_gb_max": 12.0,
+      "swap_used_gb_max_basis": "one quarter of 48 GB physical; the 200-row control already reached 8.36 GB, so a 2000-row control is EXPECTED to trip this",
+      "swap_growth_gb_per_probe_max": 2.0,
+      "swap_growth_basis": "2 GB of swap growth within a single row is runaway",
+      "memory_pressure_percent_free_min": 5,
+      "memory_pressure_consecutive_probes": 5,
+      "memory_pressure_basis": "the 200-row control reached 7 %free; 5 %free is the macOS red zone; 5 consecutive probes avoids transient dips",
+      "free_plus_inactive_gb_min": 0.3,
+      "free_plus_inactive_consecutive_probes": 5,
+      "free_plus_inactive_basis": "SECONDARY signal only. The 200-row control reached 0.405 GB with no harm, so a floor above that would refuse a state the machine is known to tolerate. inactive pages are reclaimable: this is neither free nor available memory.",
+      "slow_row_seconds": 120.0,
+      "slow_row_streak": 3,
+      "slow_row_basis": "a hang detector, NOT a performance threshold; the old 2000-row control's worst window of 95.0 s/row is normal degradation, above 120 looks like a stall",
+      "max_seconds": 28800,
+      "max_seconds_basis": "condition_clock bound; old control 5.76h, ~1.4x headroom, still bounded",
+      "process_max_seconds": 30600,
+      "process_max_seconds_basis": "30 minutes above max_seconds, so a stall during model load or teardown is also bounded"
+    },
+    "primary_signals": [
+      "swap_used_gb",
+      "swap_growth_gb_per_probe",
+      "memory_pressure_percent_free"
+    ],
+    "secondary_signals": [
+      "free_plus_inactive_gb"
+    ],
+    "consecutive_unit": "'consecutive probes' means consecutive WATCHDOG polls (~25s for 5 polls), not rows. swap_growth_gb_per_probe_max is likewise measured between adjacent watchdog polls.",
+    "stop_sequence": {
+      "1_stop_request": "the watchdog writes stop_request.json (rule, values, monotonic, wall clock, nonce) plus stop_request.sha256, THEN sends SIGTERM to the child's PROCESS GROUP",
+      "2_signal_handler": "the child's SIGTERM handler ONLY sets a flag. No JSON, no file I/O, nothing that is not async-signal-safe.",
+      "3_next_safe_row_boundary": "the child checks the flag at the next safe row boundary, reads stop_request.json and verifies its SHA-256 and nonce; a digest or nonce mismatch is REJECTED and recorded as stop_request_rejected (a tool failure)",
+      "4_partial_report": "on a verified request the child writes its partial report with stopped_early = {condition, rule, row, sampled_values, condition_clock_seconds, process_clock_seconds, requested_by: 'watchdog', stop_request_sha256} and exits 0, so partial results survive",
+      "5_grace_seconds": 120,
+      "5_grace_clock": "measured on the WATCHDOG's own time.monotonic() -- not the parent's, not wall clock",
+      "6_sigkill": "on grace expiry, re-check child_start_identity and then SIGKILL the process group; the child writes no report => outcome no_report => TERMINAL INCOMPLETE, NOT an R1 cancellation"
+    },
+    "parent_supervision": {
+      "rule": "the parent watches child, watchdog and heartbeat CONCURRENTLY while the child runs; it must NOT wait for the child to exit before noticing the watchdog died",
+      "loop_interval_seconds": 1.0,
+      "clock": "the parent's own time.monotonic()",
+      "watches": [
+        {
+          "target": "child",
+          "how": "Popen.poll()",
+          "on_bad": "finish per outcome"
+        },
+        {
+          "target": "watchdog",
+          "how": "Popen.poll() -- the watchdog is also the parent's child process",
+          "on_bad": "IMMEDIATELY request the child to stop"
+        },
+        {
+          "target": "heartbeat",
+          "how": "the watchdog sends a heartbeat over IPC after each poll; the parent records the last one on its own monotonic clock",
+          "on_bad": "gap > 30.0s => IMMEDIATELY request the child to stop"
+        }
+      ],
+      "withdrawn": "the earlier post-hoc watchdog_gap check (comparing timestamps only after the child exited) is withdrawn and replaced by this live supervision"
+    },
+    "startup_sequence": {
+      "steps": [
+        "1. gate passes                                  (no boot consumed)",
+        "2. per-file source verification passes           (no boot consumed)",
+        "3. start the watchdog, wait for its ready handshake  (no boot consumed, child not yet bound)",
+        "4. atomically write measurement_started          (*** the boot is consumed here ***)",
+        "5. spawn the child in a NEW process group",
+        "6. hand the child's identity to the watchdog over the pipe/socketpair",
+        "7. watchdog replies armed and begins enforcing",
+        "8. the parent enters the three-way supervision loop"
+      ],
+      "failure_semantics": [
+        {
+          "at": "1-2",
+          "result": "gate_attempt or pre_spawn_abort; NO boot consumed; retryable in the same boot"
+        },
+        {
+          "at": "3 (watchdog fails to start, or ready times out)",
+          "result": "measurement_started MUST NOT be written and NO boot is consumed; write a retryable watchdog_launch_failed event; retryable in the same boot after a fix"
+        },
+        {
+          "at": "5 (child spawn fails)",
+          "result": "measurement_started was already written at 4, so the boot is spent => TERMINAL INCOMPLETE with outcome no_report"
+        },
+        {
+          "at": "6-7 (identity handoff or armed timeout)",
+          "result": "boot already spent => TERMINAL INCOMPLETE"
+        },
+        {
+          "at": "8 (watchdog dies or heartbeat gap during the run)",
+          "result": "request the child to stop; TOOL FAILURE => TERMINAL INCOMPLETE"
+        }
+      ],
+      "child_identity": {
+        "why": "the watchdog must never target a bare PID: a PID can be reused and the wrong process killed",
+        "fields": {
+          "child_pid": "the target process",
+          "child_pgid": "process group; SIGTERM/SIGKILL are sent to the PROCESS GROUP, never to a bare PID",
+          "nonce": "secrets.token_hex(16), generated per launch, NEVER reused; written to launch.json and passed to the child, which echoes it in its report",
+          "child_start_identity": "the child's process start time, so 'same PID' and 'same process' can be told apart"
+        },
+        "pid_reuse_guard": "re-check child_start_identity immediately before signalling; on mismatch send NOTHING, record identity_mismatch and have the parent finalise"
+      }
+    },
+    "tool_failure_vs_measurement": {
+      "measurement_results_only": [
+        "a real safety threshold trip (swap / pressure / free+inactive / slow_row / max_seconds / process_max_seconds)",
+        "a computable D100 >= 3.0 or Dmax >= 6.0"
+      ],
+      "tool_failures": [
+        "probe_unavailable",
+        "watchdog_died",
+        "heartbeat_gap",
+        "identity_mismatch",
+        "stop_request_rejected",
+        "no_report",
+        "nonzero_exit",
+        "timed_out"
+      ],
+      "tool_failure_rules": [
+        "MUST NOT be written as Q1 = fails",
+        "MUST NOT trigger R1",
+        "MUST NOT produce an early_stop_finding",
+        "if it happens AFTER measurement_started: the boot is spent => TERMINAL INCOMPLETE, and only a NEW experiment id may run again",
+        "if it happens BEFORE measurement_started (step 3): no boot consumed, retryable in the same boot"
+      ],
+      "why": "writing 'our supervisor crashed' as 'the treatment failed to hold' turns a tool bug into an experimental conclusion -- exactly what this project has been guarding against"
+    },
+    "watchdog_poll_failure_rules": {
+      "single_failure": "record null values plus the failure reason string",
+      "streak_effect": "a failed poll NEITHER advances NOR resets any violation streak",
+      "probe_failure_streak_max": 3,
+      "on_streak_exceeded": "request the child to stop with reason probe_unavailable -- which is a TOOL FAILURE, see tool_failure_vs_measurement",
+      "late_poll_counts_as_failure": "a time.monotonic() gap over 30.0s between adjacent watchdog polls counts as one failure; the watchdog does not wait for row boundaries, so a slow row cannot misfire it"
+    },
+    "on_real_safety_trip": [
+      "the run is NOT a complete arm and may not feed the headline",
+      "do NOT relax any threshold and re-run",
+      "Q1_run = fails, taking PRIORITY over the metrics, and holding even when D100/Dmax are null for lack of rows",
+      "Q2_run keeps its real value when computable, but is DESCRIPTIVE ONLY and can never support adoption",
+      "R1 fires",
+      "per the decision matrix, neither a safety trip nor any tool failure may lead straight to option C"
+    ]
+  },
+  "clear_cost_checks": {
+    "expected_positions": "[10, 20, ..., k] where k is that run's declared row count; checked row by row, not only counted",
+    "expected_calls": "k / 10",
+    "per_call_sum_must_equal_total": true,
+    "per_call_sum_must_equal_row_span_sum": true,
+    "teardown_counted_and_timed_separately": true,
+    "teardown_outside_condition_clock": true,
+    "growth": "mean(last 20 calls) / mean(first 20 calls)",
+    "growth_valid_at_k500": "k=500 gives 50 calls, so the first 20 and last 20 do not overlap",
+    "share": "clear_total_seconds / end_to_end_seconds"
+  },
+  "float_tolerances": {
+    "seconds_stored_rounded": false,
+    "loss_stored_rounded": false,
+    "same_array_identity": {
+      "rel_tol": 1e-09,
+      "abs_tol": 1e-09,
+      "applies_to": "values derived from the same unrounded array, e.g. per-call sum vs recorded total"
+    },
+    "different_summation_order": {
+      "rel_tol": 1e-06,
+      "abs_tol": 1e-06,
+      "applies_to": "seconds derived by different accumulation orders, e.g. row-span sum vs per-call sum"
+    },
+    "display_rounded_values": "display only; must never take part in an identity check",
+    "loss_engineering_tolerance": {
+      "abs_tol": 0.001,
+      "applies_to": "prefix consistency between runs of different declared lengths",
+      "basis": "pre-selected engineering tolerance, same as report 15; NOT derived from report 14's four-decimal storage"
+    },
+    "integer_fields": "exact equality, no tolerance (clear_calls, tokens, row numbers)"
+  },
+  "verdicts": {
+    "note": "Three-state with a declared indeterminate band. 'indeterminate' is an allowed outcome and must be reported as such.",
+    "Q1_run": {
+      "computed_only_when": "there was no tool failure",
+      "real_safety_trip_takes_priority": "swap / pressure / free+inactive / slow_row / max_seconds / process_max_seconds -- any of these makes Q1_run = 'fails' REGARDLESS of whether D100/Dmax are computable; the metrics are then null + reason",
+      "fails": "any REAL safety threshold tripped (PRIORITY); or D100 >= 3.0; or Dmax >= 6.0",
+      "holds": "no safety threshold tripped AND D100 <= 1.5 AND Dmax <= 3.0 (both computable)",
+      "indeterminate": "no safety threshold tripped, metrics computable, values in the middle band",
+      "not_applicable": "no safety threshold tripped, but D100 or Dmax could not be computed for lack of rows"
+    },
+    "Q2_run": {
+      "computed_only_when": "there was no tool failure",
+      "not_driven_by_safety_trips": "a safety trip speaks to Q1, not Q2; it does not make Q2 'scales'",
+      "on_safety_trip": "if enough rows remain, KEEP the real Q2_run value (it was genuinely computed) but mark it descriptive only -- it can never support adoption, which requires Q1_plan == holds_to_2000. Only insufficient rows give not_applicable.",
+      "stable": "clear_growth <= 1.5 AND clear_share <= 0.03 (both computable)",
+      "scales": "clear_growth >= 3.0 OR clear_share >= 0.05 (that term computable)",
+      "indeterminate": "both computable, values in the middle band",
+      "not_applicable": "clear_growth is null (fewer than 400 rows); clear_share is still reported but is DESCRIPTIVE only"
+    },
+    "repeatability": {
+      "metric": "P(a..b) = mean compute seconds per row over rows a..b for one run; R(a..b) = max over runs / min over runs",
+      "repeatable": "R <= 1.10",
+      "not_repeatable": "R >= 1.30",
+      "indeterminate": "anything else",
+      "basis": "exp002's two treatment runs (different boots, different block positions) had full-run means of 1.3107 and 1.3087, R = 1.0015; 1.10 is a loose engineering band that still catches a real boot-to-boot difference",
+      "window_dispersion": "max relative deviation of the 100-row aggregates within the same span -- descriptive only, not a criterion",
+      "applies_to": {
+        "B": [
+          "R(1..500) over three runs",
+          "R(1..1000) over two runs"
+        ],
+        "A2": [
+          "R(1..2000) over two runs"
+        ],
+        "A": "not claimed -- a single run leaves R undefined"
+      }
+    },
+    "thresholds_are_not_pass_marks_derived_from_data": "The 200-row readings (treatment D20 = 0.77 / 0.87, clear share ~2%) motivated these numbers but are not the criterion. The criterion is this table, frozen before any run.",
+    "Q1_plan": {
+      "type": "fixed machine-readable enum",
+      "enum": [
+        "holds_to_2000",
+        "holds_to_1000",
+        "holds_to_500",
+        "fails",
+        "indeterminate",
+        "not_applicable"
+      ],
+      "holds_to_2000": "the k=2000 run's Q1_run is 'holds'",
+      "holds_to_1000": "k=1000 is 'holds' but k=2000 did not reach 'holds' and is not 'fails'",
+      "holds_to_500": "k=500 is 'holds' but k=1000 did not reach 'holds' and is not 'fails'",
+      "fails": "some run's Q1_run is 'fails'; k_fail records the first",
+      "indeterminate": "no run 'fails', but the longest completed run is 'indeterminate'",
+      "not_applicable": "no run produced a computable Q1 verdict",
+      "k_star": "largest k whose Q1_run is 'holds', else null",
+      "k_fail": "first k whose Q1_run is 'fails', else null",
+      "engineering_adoption_accepts_only": "holds_to_2000"
+    },
+    "Q2_plan": {
+      "type": "fixed machine-readable enum",
+      "enum": [
+        "stable",
+        "scales",
+        "indeterminate",
+        "not_applicable"
+      ],
+      "aggregates_only": "runs that actually completed AND whose Q2_run is computable, i.e. Q2_run in {stable, scales, indeterminate}",
+      "excluded": "runs whose Q2_run is not_applicable do not take part and do not drag the aggregate to indeterminate",
+      "scales": "any contributing run is 'scales'",
+      "indeterminate": "otherwise, any contributing run is 'indeterminate'",
+      "stable": "all contributing runs are 'stable' and at least one contributes",
+      "not_applicable": "no run can contribute"
+    },
+    "tool_failure_produces_no_verdict": {
+      "rule": "if a run ended in a TOOL FAILURE, Q1_run = null with Q1_reason = 'tool_failure: <which>' and Q2_run = null with the same reason",
+      "not": "not 'fails', and not 'not_applicable'",
+      "why": "not_applicable means 'this measurement cannot decide'; a tool failure means 'this was not a measurement at all'. The two must never impersonate each other.",
+      "consequence": "terminal incomplete, and R1 does not fire"
+    }
+  },
+  "conditional_stop_rule": {
+    "rule_id": "R1",
+    "declared_in_plan_at_init": true,
+    "text_enters_plan_digest": true,
+    "statement": "After the measurement_finished event of a run whose outcome is 'completed' AND which had NO tool failure, the parent RECOMPUTES that run's Q1_run verdict from the child's per_row array and watchdog.jsonl (never trusting any conclusion field the child wrote). If the verdict is 'fails', every not-yet-executed run in the plan is cancelled by rule. 'holds', 'indeterminate' and 'not_applicable' all continue.",
+    "only_fails_cancels": true,
+    "indeterminate_continues_because": "a longer run is exactly what turns indeterminate or not_applicable into a definite verdict",
+    "safety_trip_implies_fails": true,
+    "b1_decision_input": "the complete Q1_run verdict (stop conditions FIRST, then D100 and Dmax, both of which must be computable for 'holds'), not D100 alone. At k=500 both D100 and Dmax are computable (500 >= 200, >= 120) and clear_growth is too (50 calls >= 40). The decision is made by the rule, not by the operator at the time.",
+    "event": {
+      "event": "plan_arm_cancelled",
+      "consumes_a_boot": false,
+      "written_after": "the triggering measurement_finished event",
+      "fields": [
+        "experiment_id",
+        "plan_digest",
+        "rule_id",
+        "triggered_by_run",
+        "triggering_run_outcome",
+        "recomputed_verdict",
+        "verdict_source",
+        "cancelled_runs",
+        "previous_event_digest"
+      ]
+    },
+    "finalise": {
+      "session_state": "complete_by_rule",
+      "not": [
+        "complete",
+        "terminal incomplete"
+      ],
+      "stopped_reason_example": "R1 fired at b1",
+      "session_next_after_cancel": "refuses, pointing at --session-finalize"
+    },
+    "replay_checks": [
+      "the triggering run's outcome is actually 'completed' AND it had no tool failure",
+      "recompute the Q1_run verdict from the triggering child's per_row and watchdog.jsonl and compare field by field; uncomputable fields must be null + reason, and a 0 is treated as tampering",
+      "the recomputed verdict must actually be 'fails', and its cause must be a real safety threshold or a computable D100/Dmax",
+      "cancelled_runs must equal exactly the plan's not-yet-executed runs at that point",
+      "no cancelled run may have a measurement_started event"
+    ],
+    "why_this_is_legal_in_an_immutable_plan": "the plan declares all three runs AND rule R1 from the start, and the rule text is inside plan_digest; cancelling is not editing the plan, it is following a branch the plan already declared, and anyone can recompute from disk that the branch was taken correctly",
+    "fires_only_on_completed_outcome": true,
+    "not_r1": "every entry of never_fires_on goes to terminal_rules; they are TOOL FAILURES with no Q1 verdict for R1 to act on",
+    "fires_only_on": [
+      "a real safety threshold trip",
+      "a computable D100 >= 3.0 or Dmax >= 6.0"
+    ],
+    "never_fires_on": [
+      "probe_unavailable",
+      "watchdog_died",
+      "heartbeat_gap",
+      "identity_mismatch",
+      "stop_request_rejected",
+      "nonzero_exit",
+      "timed_out",
+      "no_report",
+      "parent crash"
+    ]
+  },
+  "replay_rules": [
+    "read-only; recompute everything, never read back a conclusion",
+    "recompute thresholds from calibration samples and compare the digest",
+    "replay every gate poll and recompute streak, passed, waited, timeout",
+    "recompute all windows and D100/D20/Dmax from per_row; when rows are insufficient the value must be null -- a 0 is treated as tampering",
+    "check clear positions row by row against [10, ..., k]; per-call sum == recorded total == row-span sum, under the float tolerances",
+    "teardown outside the condition clock",
+    "check the clock nesting invariant: model_load_seconds + condition_clock_seconds <= process_clock_seconds; gate wait does not appear in it (different process)",
+    "compare all cross-run provenance fields",
+    "recompute every safety rule and its consecutive counters from watchdog.jsonl (whose digest must match the finished event), using its own monotonic field for poll intervals; confirm that what should have stopped did, that what did not stop should not have, and that the SIGTERM/SIGKILL timing matches the grace period. Never trust the child's stopped_early; the child's every-5-rows memory[] is corroboration, not the enforcement record",
+    "prefix consistency on sample_id, tokens, supervised_tokens and loss -- and with a single run it must be not_applicable, never passed",
+    "replay the journal: consecutive events, experiment_id, started/finished digest backlink, one measurement_started per run, distinct boots",
+    "recompute the plan-level state machine: any plan_arm_cancelled event fired exactly when it should have, and the run that triggered it had outcome 'completed'",
+    "fail closed on any missing recovery field"
+  ],
+  "cross_report_prefix_check": {
+    "claim": "because pool_pairs=250, seed=0 and the same instruct_inv_train.jsonl, report 16's order is the SAME permutation as report 15 exp002's, so exp002's 200 rows are rows 1..200 of report 16's order",
+    "gates_the_headline": false,
+    "why_not": "it only holds if the new script consumes RNG in exactly the same order as scripts/15_mps_order.py; dropout 0.05 is stochastic and any extra tensor creation shifts the RNG stream",
+    "on_mismatch": "record it and explain the difference; it does NOT affect Q1 or Q2 (those are timing questions inside one script), but report 16's per-row values may not then be quoted against exp002's"
+  },
+  "implementation_constraints": {
+    "new_script": "scripts/16_longrun.py",
+    "prefer_new_files": [
+      "src/training/longrun.py or similar, rather than editing shared modules"
+    ],
+    "rationale": "RISK REDUCTION, not evidence preservation",
+    "correction": "An earlier version of this file claimed that editing the seven shared modules would break exp002's historical evidence or drop its 'source preserved' column. That claim was wrong and is withdrawn. exp002's durability rests on exp002/source_snapshot/ plus the digests in session.json and the child records; replay_session_journal() reads a finished session with check_working_tree=False, and verify_sources() checks only the snapshot in that mode. Editing a shared module later would change only an informational live-tree comparison column if the Markdown were re-rendered -- it would not invalidate the run or fail --verify.",
+    "real_reasons_to_prefer_new_files": [
+      "report 15's --verify still EXECUTES src/training/session.py and preflight.py, so edits could silently change replay behaviour even though the snapshot is untouched",
+      "keeping the live-tree column clean means a reader does not have to read a diff to judge validity",
+      "a new file has a much smaller regression surface"
+    ],
+    "if_a_shared_module_must_change": [
+      "run the full report 15 test suite and exp002 --verify first, confirming replay behaviour is unchanged",
+      "record the change and the re-verification in PROJECT_STATUS.md"
+    ],
+    "must_not_claim": "that editing shared modules would destroy exp002's historical evidence"
+  },
+  "immutable_plan_procedure": {
+    "1": "freeze this design file and record its sha256",
+    "2": "--session-init reads this JSON and embeds the constants verbatim into plan.json, recording this file's sha256 inside the plan for traceability",
+    "3": "plan_digest = sha256(canonical_json(plan)); published with os.link atomic no-clobber, EEXIST if the destination exists",
+    "4": "create source_snapshot/ with per-file digests and a manifest_digest",
+    "5": "every child re-reads plan.json, recomputes plan_digest and refuses on mismatch; every journal event carries experiment_id and plan_digest",
+    "6": "editing this design file after init cannot change any run; --verify compares the on-disk design file against the sha256 the plan recorded and reports a mismatch as informational, since the plan's embedded copy is authoritative"
+  },
+  "cost_options": {
+    "estimate_basis": {
+      "treatment_seconds_per_row": 1.3097,
+      "treatment_basis": "mean of exp002 r2 (1.3107) and r3 (1.3087)",
+      "clear_seconds_per_call": 0.2746,
+      "clear_basis": "mean of exp002 r2 (0.27915) and r3 (0.26995)",
+      "model_load_seconds": 2.2,
+      "control_prior_seconds": 20732.7,
+      "control_prior_basis": "13_lora_smoke.json train_seconds; PRIOR ONLY, not a paired control (see design doc section 2.2)",
+      "control_prior_caveat": "its first 200 rows ran at 2.85 s/row, FASTER than the current code path's 3.10-3.98 s/row, so a control today is likely slower; upper bound unknown",
+      "gate_wait_seconds_observed": [
+        300.33,
+        330.38,
+        450.54,
+        570.69
+      ],
+      "child_memory_probe_seconds_per_sample": 0.0285,
+      "child_probe_basis": "exp002 r3: 1.1695s over 41 samples, every 5 rows",
+      "watchdog_cost": "out of process, so it is NOT part of the child's end-to-end; roughly 538 polls at k=2000, 269 at k=1000, 135 at k=500"
+    },
+    "per_run_estimates": [
+      {
+        "k": 500,
+        "compute_seconds": 654.9,
+        "clear_seconds": 13.7,
+        "child_probe_seconds": 2.9,
+        "end_to_end_seconds": 673.7,
+        "clear_share": 0.0204,
+        "watchdog_polls": 135
+      },
+      {
+        "k": 1000,
+        "compute_seconds": 1309.7,
+        "clear_seconds": 27.5,
+        "child_probe_seconds": 5.7,
+        "end_to_end_seconds": 1345.1,
+        "clear_share": 0.0204,
+        "watchdog_polls": 269
+      },
+      {
+        "k": 2000,
+        "compute_seconds": 2619.4,
+        "clear_seconds": 54.9,
+        "child_probe_seconds": 11.4,
+        "end_to_end_seconds": 2687.9,
+        "clear_share": 0.0204,
+        "watchdog_polls": 538
+      }
+    ],
+    "correction_to_earlier_version": "An earlier version claimed only option B could show where the curve turns. That was wrong: a single 2000-row run's per_row array already contains 100 twenty-row windows and 2000 per-row values, so the turning point is visible in option A. B's extra value is narrower -- see below.",
+    "A": {
+      "runs": 1,
+      "boots": 1,
+      "lengths": [
+        2000
+      ],
+      "estimated_end_to_end_seconds": 2688,
+      "estimated_attended_minutes": [
+        50,
+        55
+      ],
+      "answers": [
+        "Q1 including the full degradation curve and where it turns",
+        "Q2 growth and share",
+        "Q3 whether the safety limits are approached"
+      ],
+      "cannot_answer": [
+        "cross-boot repeatability (R is undefined for one run)",
+        "anything about control"
+      ],
+      "memory_risk": "low"
+    },
+    "A2": {
+      "runs": 2,
+      "boots": 2,
+      "lengths": [
+        2000,
+        2000
+      ],
+      "estimated_end_to_end_seconds": 5376,
+      "estimated_attended_hours": [
+        1.7,
+        1.8
+      ],
+      "answers": [
+        "everything A answers",
+        "cross-boot repeatability R(1..2000) on the FULL length"
+      ],
+      "cannot_answer": [
+        "the prefix pipeline check across lengths",
+        "anything about control"
+      ],
+      "memory_risk": "low"
+    },
+    "B": {
+      "runs": 3,
+      "boots": 3,
+      "lengths": [
+        500,
+        1000,
+        2000
+      ],
+      "estimated_end_to_end_seconds": 4707,
+      "estimated_attended_hours": [
+        1.6,
+        1.8
+      ],
+      "answers_beyond_A": [
+        "the prefix pipeline check: three runs at different k must agree row for row on sample_id, tokens and loss over the shared prefix",
+        "prefix repetition: rows 1..500 measured three times across three boots, rows 1..1000 twice, giving R(1..500) and R(1..1000)"
+      ],
+      "does_not_add": [
+        "the turning point (A already has it)",
+        "more length (still 2000)",
+        "any control"
+      ],
+      "extra_property": "rule-driven cheap abort: if k=500 already verdicts 'fails', R1 cancels the remaining two runs after about 11 minutes, and the output is a restricted early_stop_finding, not a headline",
+      "cannot_answer": [
+        "anything about control"
+      ],
+      "memory_risk": "low"
+    },
+    "C": {
+      "runs": 4,
+      "boots": 4,
+      "order": [
+        "continuous",
+        "empty_cache",
+        "empty_cache",
+        "continuous"
+      ],
+      "estimated_end_to_end_seconds": 46841,
+      "estimated_attended_hours": 13.5,
+      "answers": [
+        "everything A, A2 and B answer",
+        "the paired long-run condition contrast"
+      ],
+      "cannot_answer": [
+        "mechanism",
+        "other machines/OS/torch versions",
+        "variance (still n=2 per condition)"
+      ],
+      "memory_risk": "high, concentrated in the two control runs",
+      "memory_risk_evidence": "at 200 rows the control already reached driver max 54.4 GB (37/41 over the 37.44 GB recommended max), swap 0 -> 8.36 GB, pressure down to 7 %free, free+inactive down to 0.405 GB",
+      "expected_safety_trip": "under the conservative thresholds above (swap 12.0 GB, pressure 5 %free x5), a 2000-row control is EXPECTED to trip a safety stop. That is the accepted trade: protecting the machine comes first.",
+      "scheduling_precondition": "see next_step_decision_matrix.C_preconditions_both_required"
+    },
+    "recommendation": {
+      "choice": "B first, then decide on C from B's result",
+      "reasons": [
+        "B and A2 cost the same time; B buys a correctness check on the measurement pipeline while A2 buys full-length repeatability, and repeatability rests on measuring correctly in the first place",
+        "B has a rule-driven cheap abort (R1); A and A2 are 45 minutes once started",
+        "B's conclusion scope already supports the engineering decision when Q1_plan == 'holds_to_2000' AND Q2_plan == 'stable'",
+        "what to do after B is decided ONLY by next_step_decision_matrix -- neither 'fails' nor 'indeterminate' is by itself a reason to run C"
+      ],
+      "not_recommended": {
+        "A": "about 30 minutes and 2 boots cheaper than B, but loses the pipeline check and the rule-driven abort"
+      },
+      "acceptable_substitute": {
+        "A2": "one fewer boot and repeatability measured on the full 2000 rows, at the cost of the cross-length pipeline check; reasonable if the operator's boot count is the binding constraint"
+      }
+    }
+  },
+  "conclusion_scope_for_B": {
+    "all_three_runs_are": "empty_cache",
+    "may_conclude": [
+      "the treatment's own long-run stability: how much it degraded at 2000 rows relative to its own start",
+      "the treatment's own cost: total clear seconds, share of end-to-end, and whether per-call cost grows with length",
+      "measurement repeatability on the shared prefixes"
+    ],
+    "may_not_conclude": [
+      "'empty_cache is N times faster than continuous at 2000 rows' -- B has no control",
+      "'clearing has been proven effective at long range' -- B shows the treatment did not degrade badly, not its gain over not clearing",
+      "any arithmetic that uses the old 2000-row record (13.1x) as a paired comparator"
+    ],
+    "engineering_adoption_requires": {
+      "both": [
+        "Q1_plan == 'holds_to_2000'",
+        "Q2_plan == 'stable'"
+      ],
+      "not_enough": [
+        "holds_to_1000",
+        "holds_to_500",
+        "indeterminate",
+        "not_applicable",
+        "Q2_plan == 'not_applicable' (an uncomputed cost is not a bounded cost)"
+      ],
+      "why": "Q1 alone with a scaling cost means degradation is controlled but the cost eats the benefit at length; Q2 alone with Q1 failing is worse",
+      "strongest_permitted_statement": "on this machine, this configuration and within 2000 rows, this mitigation is stable in itself and its cost is bounded -- still NOT 'proven better than not clearing'"
+    }
+  },
+  "limits": [
+    "a fresh process resets this process's allocator, heap, model and optimizer; it does not prove the OS or driver returned to a comparable state",
+    "the gate certifies the start of a run only; a 45-minute or 6-hour run is never re-gated, and should not be",
+    "a long run spans thermal states and macOS background activity; the design records this and cannot control it",
+    "all durations use a monotonic clock; wall clock is recorded but never computed with",
+    "long runs are expensive to repeat, so n stays small: B is n=1 at the full 2000 rows and n=3 on the 500-row prefix -- engineering signal, not a variance estimate",
+    "the old 2000-row record has eight provenance gaps and is a scheduling/risk prior only",
+    "the safety thresholds are conservative values set from 200-row observations and machine specs, not derived from long-run data; they may stop a run that was in fact safe, and may be insufficient for some unanticipated failure mode. What is guaranteed is only: frozen in advance, identical across conditions, fully recorded on trip, and never relaxed for a re-run",
+    "the watchdog is another process: it can itself be delayed by the scheduler, slowed by memory pressure, or killed. The late-poll and failure rules and the watchdog_gap check DETECT that, they do not PREVENT it. Under extreme paging, 'the protection slows down too' is a real failure mode this design does not claim to exclude",
+    "no option answers mechanism, other machines, other OS/torch versions, other model sizes, other row-length distributions, or lengths beyond 2000"
+  ],
+  "partial_run_metric_semantics": {
+    "rule": "If a metric cannot be computed, write null and a *_reason string of the form 'not_applicable: <why>'. NEVER write 0 -- 0 is a measured value, and writing it makes 'could not be computed' look like 'computed as zero', which is exactly the mistake exp001's stored within_tolerance=false made.",
+    "minimum_rows": {
+      "D100": 200,
+      "D20": 40,
+      "Dmax": 120,
+      "clear_growth_rows": 400,
+      "clear_growth_calls": 40,
+      "clear_share": 1
+    },
+    "D100_note": "needs 200 rows so the first and last 100 do not overlap",
+    "Dmax_note": "needs the first 100 rows plus at least one complete 20-row window",
+    "clear_share_on_partial_runs": "computable from any run with at least one row, but on a partial run it is DESCRIPTIVE only and may not decide Q2 on its own",
+    "examples_must_not_contain_zero": "every worked example in the design writes null + a *_reason string; a 0 in a metric field is treated as tampering by replay",
+    "reason_format": "not_applicable: <why>, e.g. 'not_applicable: rows_completed=37 < 200'"
+  },
+  "outputs": {
+    "note": "Two DIFFERENT products. Neither may impersonate the other.",
+    "headline_full_B": {
+      "the_only_positive_result_that_supports_adoption": true,
+      "requires": [
+        "all three runs (b1, b2, b3) ACTUALLY completed with outcome 'completed' -- runs cancelled by R1 do not count, so an early-closed session can never reach this",
+        "no safety threshold tripped AND no tool failure of any kind (probe_unavailable, watchdog death, heartbeat gap, identity_mismatch, stop_request_rejected)",
+        "the three runs came from three distinct boots",
+        "all cross-run provenance fields identical (only k may differ)",
+        "prefix consistency PASSED",
+        "all three runs honoured the treatment contract",
+        "Q1_plan == 'holds_to_2000' AND Q2_plan == 'stable'"
+      ]
+    },
+    "early_stop_finding": {
+      "emitted_when": "R1 cancels the remaining runs",
+      "is_a_restricted_negative_result_only": true,
+      "fields": {
+        "kind": "early_stop_finding",
+        "triggered_by_run": "b1",
+        "k": 500,
+        "Q1_run": "fails",
+        "reason": "safety_stop:<rule> | D100>=3.0 | Dmax>=6.0",
+        "metrics": {
+          "D100": null,
+          "D100_reason": "not_applicable: safety stop at row 137",
+          "D20": null,
+          "D20_reason": "not_applicable: safety stop at row 137",
+          "Dmax": null,
+          "Dmax_reason": "not_applicable: safety stop at row 137"
+        },
+        "Q2_run": "not_applicable",
+        "Q2_is_descriptive_only": true,
+        "prefix_consistency": "not_applicable",
+        "prefix_consistency_reason": "only one run exists; nothing to compare",
+        "adoption_supported": false
+      },
+      "prefix_consistency_must_be": "not_applicable -- with a single run there is nothing to compare, and it may NEVER be written as 'passed'",
+      "forbidden": [
+        "any positive statement (held to k, cost is stable, safe to adopt)",
+        "presenting it as a headline"
+      ],
+      "the_only_permitted_sentence": "at k=X the treatment's Q1 verdict was 'fails', because R",
+      "reason_is_restricted_to": [
+        "a real safety threshold trip",
+        "D100>=3.0",
+        "Dmax>=6.0"
+      ],
+      "tool_failures_may_never_appear_here": true,
+      "metrics_must_never_be_zero": "uncomputable metrics are null + reason"
+    }
+  },
+  "terminal_rules": {
+    "same_as_report_15": true,
+    "measurement_started_consumes_the_boot": "written before spawn",
+    "finished_outcomes": [
+      "completed",
+      "nonzero_exit",
+      "timed_out",
+      "no_report"
+    ],
+    "rule": "once a measured run has started and not successfully finished, the whole experiment is TERMINAL INCOMPLETE: neither that boot nor any later boot may re-run it; only a NEW experiment id with the full plan may follow",
+    "parent_crash": "a started event with no finished event is terminal incomplete too, recorded by --session-finalize",
+    "finalize": "--session-finalize writes an incomplete aggregate and report WITHOUT re-running anything",
+    "boundary_with_R1": [
+      {
+        "case": "run completed with no tool failure, recomputed Q1 = fails",
+        "state": "complete_by_rule",
+        "output": "early_stop_finding"
+      },
+      {
+        "case": "watchdog SIGTERM on a REAL safety trip, child wrote a partial report and exited 0",
+        "state": "outcome completed + stopped_early => Q1 fails => complete_by_rule",
+        "output": "early_stop_finding"
+      },
+      {
+        "case": "watchdog SIGKILL after the 120s grace, no report",
+        "state": "no_report => TERMINAL INCOMPLETE",
+        "output": "incomplete aggregate only"
+      },
+      {
+        "case": "nonzero_exit / timed_out / parent crash",
+        "state": "TERMINAL INCOMPLETE",
+        "output": "incomplete aggregate only"
+      },
+      {
+        "case": "probe_unavailable",
+        "state": "TOOL FAILURE => TERMINAL INCOMPLETE",
+        "output": "incomplete aggregate only"
+      },
+      {
+        "case": "watchdog died during the run",
+        "state": "TOOL FAILURE => TERMINAL INCOMPLETE",
+        "output": "incomplete aggregate only"
+      },
+      {
+        "case": "heartbeat gap > 30s",
+        "state": "TOOL FAILURE => TERMINAL INCOMPLETE",
+        "output": "incomplete aggregate only"
+      },
+      {
+        "case": "identity_mismatch / stop_request_rejected",
+        "state": "TOOL FAILURE => TERMINAL INCOMPLETE",
+        "output": "incomplete aggregate only"
+      },
+      {
+        "case": "watchdog failed to launch, BEFORE measurement_started",
+        "state": "watchdog_launch_failed, retryable, NO boot consumed",
+        "output": "retry in the same boot"
+      }
+    ],
+    "must_not_conflate": "a terminal incomplete is NOT an R1 cancellation, may NOT produce an early_stop_finding, and may NOT be described as 'closed early by rule' -- that would dress a failed execution up as a conclusion",
+    "tool_failure_after_started": "always terminal incomplete; the same experiment may NOT re-run that run just because 'it was only the tool' -- the boot is spent and the machine state has moved on. A NEW experiment id is required."
+  },
+  "next_step_decision_matrix": {
+    "note": "Fixed in advance; nothing here is left to judgement at the time. NO row leads straight to option C.",
+    "rows": [
+      {
+        "b_outcome": "safety stop tripped (swap / pressure / free+inactive / slow_row / max_seconds)",
+        "next": "settle the MACHINE SAFETY precondition first: establish whether a 2000-row treatment can finish safely on this machine at all; adjust the configuration if needed (shorter max_length, different batch/grad accum, smaller base) and re-design, then re-review",
+        "forbidden": "must NOT go straight to C -- C's control arm is far heavier on memory than treatment, so scheduling C while treatment itself trips is knowingly running into the trip"
+      },
+      {
+        "b_outcome": "probe_unavailable or watchdog_gap",
+        "next": "this is a TOOL problem, not a measurement result: fix the watchdog/probe and re-run the SAME design",
+        "forbidden": "must not go to C; must not be recorded as 'fails' or as any evidence about degradation"
+      },
+      {
+        "b_outcome": "crash / nonzero_exit / timed_out / no_report",
+        "next": "terminal incomplete per terminal_rules: --session-finalize records it, then a NEW experiment id re-runs the full plan",
+        "forbidden": "must not re-run the same run; must not emit an early_stop_finding"
+      },
+      {
+        "b_outcome": "Q2_plan == scales (no safety trip)",
+        "next": "adjust the MITIGATION itself first -- clear interval 10 -> 20/50, or a different release strategy -- and re-run B",
+        "forbidden": "must NOT go to C: C asks 'clear vs no clear', but the current clear schedule is already known to cost badly, so fix the schedule before buying a contrast"
+      },
+      {
+        "b_outcome": "Q1_plan == indeterminate (pure performance, no safety trip)",
+        "next": "consider A2 / repeated measurement to reduce single-run noise; compute R per the repeatability criteria",
+        "forbidden": "must not claim it held or failed; must not go straight to C"
+      },
+      {
+        "b_outcome": "Q1_plan == fails (pure performance, no safety trip, metrics computable)",
+        "next": "C may now be warranted -- but only if both C preconditions below hold",
+        "forbidden": "must not skip the safety precondition"
+      },
+      {
+        "b_outcome": "Q1_plan == holds_to_2000 AND Q2_plan == stable",
+        "next": "engineering adoption stands (this machine, this configuration, within 2000 rows). C becomes a rigour question, NOT something the engineering decision needs",
+        "forbidden": "must not claim 'proven better than not clearing'"
+      },
+      {
+        "b_outcome": "Q1_plan == holds_to_1000 or holds_to_500",
+        "next": "informative but NOT enough to adopt; follow the row matching k_fail or indeterminate",
+        "forbidden": "must not be treated as 'holds'"
+      }
+    ],
+    "C_preconditions_both_required": [
+      "SAFETY: the 2000-row TREATMENT completed in full with no safety stop tripped, and there is a prior plan for the control arm's memory risk",
+      "NECESSITY: the open question genuinely requires a paired control to answer (e.g. 'does clearing still help at length'), rather than being answerable from the treatment's own measurements"
+    ],
+    "if_either_precondition_fails": "do not schedule C"
+  },
+  "headline_gate_see": "outputs.headline_full_B",
+  "watchdog_log_durability": {
+    "path": "watchdog.jsonl inside the experiment directory",
+    "create": "the FINAL path is created with O_CREAT|O_EXCL -- no temp-then-rename, no overwrite; FileExistsError if it already exists",
+    "record_fields": [
+      "seq",
+      "prev_digest",
+      "monotonic",
+      "wall_clock",
+      "swap_used_gb",
+      "memory_pressure_percent_free",
+      "free_plus_inactive_gb",
+      "failed",
+      "failure_streak",
+      "violations",
+      "action"
+    ],
+    "seq": "starts at 0 and increases by exactly 1",
+    "prev_digest": "sha256 of the PREVIOUS record's exact line bytes; null for seq 0; forms a hash chain",
+    "flush_and_fsync": "every record is flush()ed AND os.fsync()ed immediately, so neither a power loss nor SIGKILL can leave a half-written last line",
+    "seal": "once the finished event is produced the file is sealed: no further appends, and the WHOLE-FILE sha256 goes into the finished event alongside the report digest",
+    "replay_must_reject": [
+      "a truncated line (the last line is not complete JSON) -- parsing failure is a rejection, never 'skip the last line'",
+      "duplicate seq (set size != line count)",
+      "missing seq (seq must be the complete range 0..n-1)",
+      "out-of-order seq (file order must equal increasing seq order)",
+      "an inserted record (the next record's prev_digest no longer matches)",
+      "a deleted record (same, plus a seq gap)",
+      "a rewritten record (its digest changed, so the next prev_digest fails)",
+      "an append after the finished event (whole-file sha256 no longer matches the finished event)",
+      "any whole-file digest mismatch"
+    ],
+    "monotonic_scope": "the monotonic field is used for poll intervals WITHIN this log only; it is never compared with the child's or the parent's monotonic clock"
+  },
+  "implementation_status": {
+    "as_of": "2026-08-15 (fourth round)",
+    "state": "PRODUCTION CODE ON EVERY PATH, EXERCISED WITH INJECTED FAKES; EXECUTION LOCKED; NEVER RUN AGAINST A MODEL",
+    "files": {
+      "src/training/watchdog.py": "SafetySpec (all thresholds), ChildIdentity and the FOUR-field identity_check, process_start_identity, reap, WatchdogLog (O_EXCL + hash chain + per-record fsync + seal), replay_watchdog_log (structure) and replay_watchdog_semantics (meaning), SafetyState including slow-row/condition/process clocks, stop request write and verify, StopFlag, watchdog_loop, supervise with a first-heartbeat deadline, LineReader/write_line/read_progress_tail, microbenchmark",
+      "src/training/longrun.py": "design-constant cross-check, safe experiment ids, immutable plan/session/snapshot/append-only journal, one-run-per-boot, session_init/session_next/session_status/session_finalize/apply_rule_r1, metrics with corrected zero semantics, clear contract [10..k], clock nesting, Q1/Q2 run and plan, headline_full_B/early_stop_finding, launch_sequence with cleanup, bidirectional replay_child, verify_experiment, render_from_json",
+      "scripts/16_longrun.py": "CLI with the full real wiring (Launcher: gate, watchdog spawn + ready, child spawn, identity handoff, armed, supervise, collect) behind a hard lock; --session-init, --session-next, --child and --watchdog-worker are ALL refused, so the pieces cannot be invoked around the lock. Approval means deleting the refusal, not writing the missing parts.",
+      "tests/test_longrun.py": "233 tests, including 4 end-to-end tests that drive session_next itself with real subprocesses and follow the session through R1, finalize and verify_experiment"
+    },
+    "execution_lock": {
+      "locked_entry_points": [
+        "--session-init",
+        "--session-next"
+      ],
+      "exit_code": 2,
+      "message": "Report 16 尚未獲 Codex 執行核准；目前只允許唯讀模式與測試",
+      "checked": "immediately after argument parsing, before any other work",
+      "no_bypass": "no flag and no environment variable; a test parses the script's AST to prove it never reads os.environ/os.getenv, and other tests drive the real CLI as a subprocess",
+      "how_it_is_lifted": "by DELETING the refusal in a reviewable change, never by adding a switch",
+      "open_entry_points": [
+        "--verify",
+        "--session-status",
+        "--from-json",
+        "--show-plan",
+        "--session-finalize",
+        "--microbenchmark"
+      ]
+    },
+    "microbenchmark": {
+      "file": "data/reports/16_watchdog_microbenchmark.json",
+      "what_it_is": "tool cost only; NOT a report 16 experiment, no session created, no model loaded",
+      "probe_wall_seconds_mean": 0.004579,
+      "probe_wall_seconds_max": 0.00967,
+      "probe_cpu_seconds_mean": 0.001247,
+      "cadence_drift_seconds_mean": 0.005832,
+      "cadence_drift_seconds_max": 0.010102,
+      "conclusion": "a 5.0s cadence holds comfortably inside the 30.0s hard ceiling"
+    },
+    "shared_modules_unchanged": "none of exp002's seven manifest files were modified; a test re-hashes each of them",
+    "not_claimed": [
+      "report 16 is complete",
+      "report 16 has been executed",
+      "any measurement result",
+      "that --verify has run against real report 16 data"
+    ],
+    "verify_and_from_json_honesty": "Both are implemented and tested against complete sessions built in temporary directories: a clean session passes, and a tampered child report, shared boot, broken snapshot, altered calibration or edited aggregate are all rejected. NO report 16 session exists on disk, so running them today reports that there is nothing to verify. That is the honest answer, not a claim that they have been exercised on real data.",
+    "from_json_is_not_an_alias": "render_from_json runs the full verification first and refuses to draw anything if it fails, so a tampered aggregate can never be typeset.",
+    "own_journal_writer": "report 16 needs two event kinds report 15 never had (watchdog_launch_failed, plan_arm_cancelled), so it carries its own journal writer over the same no-clobber primitive rather than widening a module exp002's replay still runs.",
+    "guards_proven_load_bearing": "eight guards were each removed in turn, the test that exists to catch them failed, and the file was restored byte-identically: four-field identity check, tool failure produces no Q1 verdict, R1 never fires on a tool failure, a missing loss is never a passed prefix, the first-heartbeat deadline, bidirectional stored-metric comparison, experiment ids may not be paths, and the CLI execution lock.",
+    "hardening_third_round": {
+      "journal": "schema_version, kind, contiguous index, experiment_id, plan_digest, run_id, written_at and previous_event_digest on every event; finished records started_index and the started file's sha256; validator checks plan order, the closed event set, at most one started and one finished per run, and body run/event/experiment/plan identity",
+      "locking": "session_next takes a NON-BLOCKING exclusive lock BEFORE reading the journal, then re-reads the journal, next run, boot and terminal state inside it; finalize and R1 take the same lock",
+      "completed_outcome": "qualify_outcome() requires a non-bool integer 0 exit AND a report AND a watchdog log that both exist and match their recorded digests; a bare {'outcome': 'completed'} is downgraded to no_report",
+      "calibration": "validated at session-init (samples, thresholds, fixed policy, thresholds recompute) and again by verify; the gate uses the thresholds recomputed from the calibration and the fixed policy, and verify replays every poll recomputing streak, passed, waited and the timeout",
+      "watchdog_process_ceiling": "enforced from the watchdog's OWN monotonic elapsed time, checked before any early return, so a child wedged before it ever writes progress is still stopped at 30,600s",
+      "progress_rules": "progress that never arrives is normal while a model loads and is bounded by the process ceiling; progress that arrives and stops advancing is progress_stalled, an explicit tool failure",
+      "nonce": "cross-checked against the parent's independent launch record, never against the identity being checked",
+      "replay": "loads and authenticates the stop request by digest and nonce, replays action order, heartbeat sequence, the SIGTERM reason and the 120s grace",
+      "r1": "runs automatically inside session_next after a qualifying finished run, records the report and watchdog digests it recomputed from, and its recorded verdict is compared field by field on replay",
+      "aggregate": "every derived field is compared against a fresh derivation, not a shortlist; missing and unknown fields are both rejected"
+    },
+    "adversarial_regression_suite": "eight adversarial cases were written first and confirmed to FAIL against the previous version (30 failures), then the code was fixed until all of them fail closed: missing completed-run evidence, broken journal numbering or body identity, broken started/finished backlinks, a child report disagreeing with the plan, an incomplete or rewritten calibration, a tampered aggregate field, missing watchdog evidence or an R1 that did not replay against the watchdog log, and a child that never reports progress at all.",
+    "what_implemented_does_not_mean": [
+      "that the measuring child has ever loaded a model",
+      "that --verify or --from-json have run against real report 16 data",
+      "that the CLI wiring has been exercised end to end against a real model",
+      "the first unlocked run should still be treated as the first real trial"
+    ],
+    "fourth_round": {
+      "production_child": "run_child() is no longer a placeholder: it builds the frozen 250-pair / 2000-row pool, takes the seed=0 permutation over row indices, truncates to the run's k, loads tokenizer, model, LoRA and AdamW, times every row, clears on every 10th, records analysis data and a progress line on every 5th, authenticates any stop request at a row boundary, and writes a full report atomically with no-clobber. Dependencies are injected through ChildDeps; tests drive THAT function with FakeChildDeps rather than a substitute child.",
+      "progress_stall_accounting": "a row that advances resets progress_stall_polls to zero; only a repeated row accumulates; a row that goes backwards, is not an int, is a bool, or is below 1 is refused as progress_invalid",
+      "preconditions_before_the_gate": "session_next replays calibration digest, samples to thresholds, the fixed policy, the session thresholds, plan and session identity, the source snapshot, the journal and every finished run's child and watchdog evidence -- inside the lock and BEFORE the gate. Any problem means the gate is never polled, no event is written and no boot is spent.",
+      "one_provenance_list": "PROVENANCE_FIELDS is the single section 4.6 list, used by the child writer, single-run replay and the cross-run comparison. A field missing from every run now fails: identical absence is not agreement.",
+      "design_digest_is_informational": "a changed design file on disk is reported in notes, not problems, matching what the design says. The plan embeds frozen_constants verbatim under plan_digest, so the file on disk cannot change what a run was judged by."
+    }
+  },
+  "frozen_constants": {
+    "note": "THE machine-readable authority. --session-init reads this block and embeds it verbatim into plan.json; src/training/longrun.py cross-checks its own module constants against it and refuses to build a plan on any mismatch, so there can never be a second set of constants quietly winning.",
+    "lengths": [
+      500,
+      1000,
+      2000
+    ],
+    "run_ids": [
+      "b1",
+      "b2",
+      "b3"
+    ],
+    "condition": "empty_cache",
+    "pool_pairs": 250,
+    "rows_per_pair": 8,
+    "pool_rows": 2000,
+    "seed": 0,
+    "window": 20,
+    "secondary_aggregation": 100,
+    "memory_every": 5,
+    "empty_cache_every": 10,
+    "min_rows": {
+      "D100": 200,
+      "D20": 40,
+      "Dmax": 120,
+      "clear_growth": 400
+    },
+    "clear_growth_min_calls": 40,
+    "growth_segment": 20,
+    "bands": {
+      "Q1_holds_D100_max": 1.5,
+      "Q1_holds_Dmax_max": 3.0,
+      "Q1_fails_D100_min": 3.0,
+      "Q1_fails_Dmax_min": 6.0,
+      "Q2_stable_growth_max": 1.5,
+      "Q2_stable_share_max": 0.03,
+      "Q2_scales_growth_min": 3.0,
+      "Q2_scales_share_min": 0.05,
+      "repeatable_max": 1.1,
+      "not_repeatable_min": 1.3
+    },
+    "loss_tolerance": 0.001,
+    "safety": {
+      "swap_used_gb_max": 12.0,
+      "swap_growth_gb_per_probe_max": 2.0,
+      "memory_pressure_percent_free_min": 5,
+      "memory_pressure_consecutive_probes": 5,
+      "free_plus_inactive_gb_min": 0.3,
+      "free_plus_inactive_consecutive_probes": 5,
+      "slow_row_seconds": 120.0,
+      "slow_row_streak": 3,
+      "max_seconds": 28800.0,
+      "process_max_seconds": 30600.0,
+      "poll_seconds": 5.0,
+      "poll_max_gap_seconds": 30.0,
+      "probe_failure_streak_max": 3,
+      "heartbeat_gap_seconds": 30.0,
+      "first_heartbeat_deadline_seconds": 30.0,
+      "parent_supervision_interval_seconds": 1.0,
+      "grace_seconds": 120.0,
+      "ready_timeout_seconds": 30.0,
+      "armed_timeout_seconds": 30.0
+    }
+  },
+  "zero_semantics": {
+    "rule": "zero is a legitimate measurement. A ratio whose tail genuinely measured 0.0 is stored as 0.0 and passes replay.",
+    "null_is_only_for": "a value that cannot be computed at all -- too few rows, or a zero baseline that makes the ratio undefined -- and it always carries a *_reason",
+    "replay": "stored and recomputed are compared in BOTH directions: a computable metric stored as null is rejected, an uncomputable metric stored with a value is rejected, a mismatched reason is rejected, and unexpected or missing keys are rejected"
+  }
+}

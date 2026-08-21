@@ -1,0 +1,26 @@
+{
+  "kind": "watchdog_microbenchmark",
+  "note": "tool cost only; not a report 16 experiment, no session, no model",
+  "probe_wall_seconds": {
+    "n": 50,
+    "mean": 0.004579,
+    "min": 0.004238,
+    "max": 0.00967,
+    "median": 0.00437
+  },
+  "probe_cpu_seconds": {
+    "n": 50,
+    "mean": 0.001247,
+    "min": 0.001095,
+    "max": 0.00499,
+    "median": 0.001142
+  },
+  "cadence_seconds": 5.0,
+  "cadence_drift_seconds": {
+    "n": 8,
+    "mean": 0.005832,
+    "min": 0.000222,
+    "max": 0.010102,
+    "median": 0.006696
+  }
+}

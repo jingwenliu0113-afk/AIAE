@@ -1,0 +1,34 @@
+{
+  "seed": 0,
+  "max_bricks": 150,
+  "populations": {
+    "source 400": {
+      "n": 400,
+      "stud_connected": 369,
+      "ground_connected": 400,
+      "with_unsupported": 335,
+      "total_unsupported": 3016,
+      "total_bricks": 33352,
+      "median_stud_components": 1
+    },
+    "paired source 60": {
+      "n": 60,
+      "stud_connected": 53,
+      "ground_connected": 60,
+      "with_unsupported": 54,
+      "total_unsupported": 433,
+      "total_bricks": 5265,
+      "median_stud_components": 1
+    },
+    "paired retile 60": {
+      "n": 60,
+      "stud_connected": 23,
+      "ground_connected": 29,
+      "with_unsupported": 56,
+      "total_unsupported": 405,
+      "total_bricks": 4377,
+      "median_stud_components": 2,
+      "unsolved": 0
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "rows": {
+    "train": 42604,
+    "test": 4785
+  },
+  "total_bricks": 5097330,
+  "parse_failures": 0,
+  "oob_h_to_x": 0,
+  "oob_h_to_y": 838563,
+  "raw_spellings": {
+    "1x1": 930775,
+    "1x2": 615295,
+    "2x1": 612169,
+    "2x2": 603326,
+    "6x2": 565982,
+    "2x6": 537204,
+    "8x1": 191997,
+    "1x4": 165336,
+    "4x1": 163722,
+    "4x2": 153577,
+    "2x4": 153195,
+    "1x8": 150546,
+    "6x1": 129021,
+    "1x6": 125185
+  },
+  "canonical_parts": {
+    "1x2": 1227464,
+    "2x6": 1103186,
+    "1x1": 930775,
+    "2x2": 603326,
+    "1x8": 342543,
+    "1x4": 329058,
+    "2x4": 306772,
+    "1x6": 254206
+  },
+  "objects": 28259,
+  "multi_structure_objects": 18790,
+  "variants_identical_inventory": 11944,
+  "variants_differ_counts_only": 5595,
+  "variants_differ_types": 1251,
+  "leaked_objects": 0,
+  "structures_with_collisions": 0,
+  "bricks_per_structure": {
+    "min": 6,
+    "p50": 92,
+    "p95": 252,
+    "max": 409
+  }
+}

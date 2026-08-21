@@ -1,0 +1,33 @@
+{
+  "seed": 0,
+  "n": 60,
+  "results": {
+    "per-layer": {
+      "attempted": 60,
+      "solved": 60,
+      "stud_connected": 23,
+      "rate": 0.38333333333333336,
+      "mean_bricks": 72.95,
+      "seconds": 7.0,
+      "rate_over_attempted": 0.38333333333333336
+    },
+    "joint": {
+      "attempted": 60,
+      "solved": 60,
+      "stud_connected": 20,
+      "rate": 0.3333333333333333,
+      "mean_bricks": 72.95,
+      "seconds": 11.2,
+      "rate_over_attempted": 0.3333333333333333
+    },
+    "joint+stagger": {
+      "attempted": 60,
+      "solved": 53,
+      "stud_connected": 11,
+      "rate": 0.20754716981132076,
+      "mean_bricks": 130.75471698113208,
+      "seconds": 985.2,
+      "rate_over_attempted": 0.18333333333333332
+    }
+  }
+}

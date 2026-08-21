@@ -1,0 +1,50 @@
+.venv/
+__pycache__/
+*.pyc
+data/raw/
+data/processed/
+artifacts/checkpoints/
+artifacts/renders/
+.DS_Store
+.hf_cache/
+
+# Local credentials and editor state
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Model artifacts must be reviewed explicitly before redistribution
+*.safetensors
+*.ckpt
+*.pth
+*.pt
+
+# Session locks are per-machine runtime state, not results. Matched anywhere
+# under data/reports/ -- report 16 names its lock `.lock` inside the session
+# directory rather than `.<id>.lock` beside it, so a rule written for report
+# 15's shape left exp001/.lock untracked-but-not-ignored and one `git add`
+# away from being committed.
+data/reports/**/.lock
+data/reports/**/.*.lock
+
+# Per-record evidence must never reach a public export. These paths stay in
+# the private research tree: they are session journals, launch records,
+# watchdog logs, source snapshots and failure evidence, and the frozen split
+# manifest, which is a per-object identifier list.
+#
+# They are deliberately *not* ignored here -- the private repository has no
+# remote and records them on purpose. The public export is built by an
+# explicit allowlist (scripts/17_public_snapshot.py), never by mirroring this
+# working tree, so this block is documentation of the boundary rather than a
+# rule the private tree enforces on itself.
+#   data/reports/15_mps_order/exp*/
+#   data/reports/16_longrun/
+#   data/splits/
+
+# Never, in either tree
+*.gguf
+*.h5
+*.msgpack
+.hf_home/
