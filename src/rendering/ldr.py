@@ -45,16 +45,30 @@ LDU_BRICK = 24
 DEFAULT_COLOUR = 115
 
 
-def brick_to_ldr(
+def brick_line(
     brick: Brick, *, colour: int = DEFAULT_COLOUR, base_height: float = 0
 ) -> str:
-    """One Type-1 line plus a ``0 STEP`` marker."""
+    """One Type-1 line, with no step marker.
+
+    Split out from :func:`brick_to_ldr` so the assembly export can group
+    several bricks under one ``0 STEP`` without a second copy of the
+    coordinate conversion.  The conversion is the part that is pinned against
+    the reference implementation, and there is exactly one of it.
+    """
     x = (brick.x + brick.h * 0.5) * LDU_STUD
     z = (brick.y + brick.w * 0.5) * LDU_STUD
     y = (brick.z + base_height) * -LDU_BRICK
     ori = 1 if brick.h > brick.w else 0
     part = PART_TO_LDRAW[brick.part]
-    return f"1 {colour} {x} {y} {z} {_MATRIX[ori]} {part}\n0 STEP\n"
+    return f"1 {colour} {x} {y} {z} {_MATRIX[ori]} {part}\n"
+
+
+def brick_to_ldr(
+    brick: Brick, *, colour: int = DEFAULT_COLOUR, base_height: float = 0
+) -> str:
+    """One Type-1 line plus a ``0 STEP`` marker."""
+    return brick_line(brick, colour=colour,
+                      base_height=base_height) + "0 STEP\n"
 
 
 def to_ldr(
@@ -73,6 +87,43 @@ def to_ldr(
     for i, b in enumerate(bricks):
         colour = (colours or {}).get(i, DEFAULT_COLOUR)
         out.append(brick_to_ldr(b, colour=colour, base_height=base_height))
+    return "".join(out)
+
+
+def to_ldr_steps(
+    steps: list[list[int]],
+    bricks: list[Brick],
+    *,
+    colours: dict[int, int] | None = None,
+    base_height: float = 0,
+) -> str:
+    """Serialise a structure with one ``0 STEP`` per assembly step.
+
+    ``steps`` are lists of indices into ``bricks``, in build order.  This is
+    what ``0 STEP`` is for: a viewer walks the file a step at a time, so the
+    steps in the file have to be the steps a person would actually build.
+    The default writer emits one marker per brick, which is a step per brick;
+    this one takes the order from the assembly planner instead.
+
+    Every brick must appear exactly once across the steps.  A missing or
+    repeated index would produce a file that is not the structure it claims
+    to be, so it is refused rather than written.
+    """
+    seen: list[int] = [index for step in steps for index in step]
+    if sorted(seen) != list(range(len(bricks))):
+        raise ValueError(
+            f"the steps cover {len(seen)} index(es) for {len(bricks)} bricks; "
+            "every brick must appear exactly once in exactly one step")
+    out = []
+    for step in steps:
+        if not step:
+            raise ValueError("an assembly step with no bricks is not a step")
+        for index in step:
+            out.append(brick_line(
+                bricks[index], colour=(colours or {}).get(index,
+                                                          DEFAULT_COLOUR),
+                base_height=base_height))
+        out.append("0 STEP\n")
     return "".join(out)
 
 

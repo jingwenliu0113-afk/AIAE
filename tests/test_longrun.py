@@ -3371,7 +3371,16 @@ def test_r4_run_child_is_not_a_placeholder():
         assert token in src, f"the child must do its own {token}"
     prod = inspect.getsource(lr.ProductionChildDeps)
     assert "sample_pairs" in prod and "randperm" in prod
-    assert "n_pairs=POOL_PAIRS" in prod and lr.POOL_PAIRS == 250
+    # The pair count now comes from the named source rather than from the
+    # constant directly, because the final run reads the whole split. What
+    # matters is unchanged and is asserted rather than grepped: the default
+    # source is the frozen pool, and the frozen pool is still 250 pairs.
+    assert 'n_pairs=shape["pairs"]' in prod
+    assert lr.DATA_SOURCES["pool"] == {"pairs": 250, "rows": 2000}
+    assert lr.POOL_PAIRS == 250
+    import inspect as _inspect
+    assert _inspect.signature(
+        lr.ProductionChildDeps.__init__).parameters["source"].default == "pool"
 
 
 def test_r4_run_child_writes_a_report_replay_accepts(tmp_path):
@@ -3567,10 +3576,18 @@ class SpyOptimizer:
 class SpyTorch:
     """Only the surface prepare_training and the teardown actually touch."""
 
-    def __init__(self, log, holder=None):
+    def __init__(self, log, holder=None, mps_available=True):
         self.log, self.holder = log, holder
         self.optim = types.SimpleNamespace(AdamW=self._adamw)
         self.mps = types.SimpleNamespace(empty_cache=self._empty_cache)
+        # Report 16 measures on a machine that has an MPS *backend*, so the
+        # stand-in has to say so. ``_empty_cache`` used to ask only whether
+        # ``torch.mps.empty_cache`` existed -- true on every build, including
+        # the CUDA one where calling it raises -- and this stub passed that
+        # check by accident. It now answers the question that is actually
+        # asked, and ``mps_available=False`` models the other kind of machine.
+        self.backends = types.SimpleNamespace(
+            mps=types.SimpleNamespace(is_available=lambda: mps_available))
 
     def manual_seed(self, seed):
         self.log.append(("manual_seed", seed))

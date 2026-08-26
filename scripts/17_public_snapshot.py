@@ -98,6 +98,15 @@ PRIVATE_DENY: tuple[tuple[str, str], ...] = (
     ("tests/test_public_snapshot.py",
      "the private release gate; it verifies this boundary rather than "
      "being part of what the boundary publishes"),
+
+    # The vision pack's own gate, withheld for the same reason and one more:
+    # it builds a real 222 MB pack out of the private image tree, so in a
+    # published checkout it can only error. It still travels *in the vision
+    # pack*, where the node has the images and it means something.
+    ("tests/test_vision_pack.py",
+     "the vision pack's release gate; it builds a real pack from the private "
+     "image tree, so a published copy could only error. It travels in the "
+     "vision pack itself, where the images are present"),
 )
 
 
@@ -114,12 +123,17 @@ def _decided_denials() -> tuple[tuple[str, str], ...]:
 PUBLIC_ALLOW: tuple[str, ...] = (
     ".gitignore",
     "requirements.txt",
+    "requirements-vision.txt",
     "README.md",
     "LICENSE",
     "SECURITY.md",
     "CONTRIBUTING.md",
     "THIRD_PARTY_NOTICES.md",
     "BRICKAGAIN_PROJECT_WORKFLOW.md",
+    "SHOWCASE.md",
+    "DELIVERY.md",
+    "UI.md",
+    "VISION.md",
 
     "src/**/*.py",
     "scripts/*.py",
@@ -395,11 +409,43 @@ APPROVED_HITS: dict[str, dict[str, int]] = {
     'tests/test_lora.py': {
         'personal-path|46dc943e3424a225': 1,
     },
+    # the operator warning that tells the node *not* to keep the pack on the
+    # Windows filesystem. A bare mount-point prefix in a sentence about
+    # avoiding it; it names no one and no file.
+    'GPU_NODE.md': {
+        'personal-path|378af5e2589eaedc': 1,
+    },
+    # synthetic fixtures only, and each one is the thing under test: fixed
+    # AAAABBBB literals shaped like a provider token and an organization id, an
+    # RFC 6761 reserved domain, one invented instant asserting that
+    # precise-timestamp is deliberately *not* a pack scan kind, and one
+    # invented path under a fictional `someone`. No real credential appears in this file, and the
+    # tests that use these assert they are refused rather than published.
+    'tests/test_pack.py': {
+        'credential|77f1b036a294fc1a': 2,
+        'precise-timestamp|0083450dd545be80': 1,
+        'email|2f761a0ba6fc6541': 1,
+        'email|8280602002e22b1e': 1,
+        'organization-id|f8b5a28bf7a01091': 1,
+        'personal-path|890701bc01cc8964': 1,
+    },
     # invented timestamps in gate and journal fixtures.
     'tests/test_mps_order.py': {
         'precise-timestamp|04e3d25947edc224': 3,
         'precise-timestamp|3a0c4546edba4087': 1,
         'precise-timestamp|a9fee6255ba06578': 1,
+    },
+    # Two invented instants inside test fixtures: the `started_at` and
+    # `sealed_at` a test writes into a completion record it builds in order to
+    # forge one and watch the checker refuse it. They are arguments to a
+    # builder, not a record of when any machine did anything, and no run
+    # produced them. Approved as the two exact strings they are, at the counts
+    # they occur -- which is the same protection every other entry gets: a
+    # third instant, a changed one, or one of these disappearing all fail the
+    # audit, and the build still refuses on anything unapproved.
+    'tests/test_core_eval.py': {
+        'precise-timestamp|2b1b6d0b7446f08d': 3,
+        'precise-timestamp|3baec72a1aea29a3': 2,
     },
 }
 

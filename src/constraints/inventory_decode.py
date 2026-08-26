@@ -97,6 +97,22 @@ class InventoryGate(BrickGate):
         self.accepted.append(part)
 
 
+def _gated(gpt, caption, inventory, gate_cls, decode, kw):
+    """The pairing itself, once. Both public entry points go through here.
+
+    The stock has to reach the model twice: once as the ``### Available Parts``
+    block it reads, and once as the counter the gate enforces. Those must be
+    the same numbers, so the opening quantities are snapshotted before the gate
+    starts spending them -- the gate mutates ``inventory`` in place, and handing
+    the live object to the prompt builder would make what the model was told
+    depend on when the string happened to be rendered.
+    """
+    opening = inventory.as_dict()
+    gate = gate_cls(gpt.slots, inventory)
+    gate.opening_inventory = opening
+    return decode(gpt)(caption, inventory=opening, gate=gate, **kw), gate
+
+
 def generate_with_inventory(
     gpt,
     caption: str,
@@ -107,13 +123,6 @@ def generate_with_inventory(
 ):
     """Run BrickGPT under a stock gate, with the matching prompt.
 
-    The stock has to reach the model twice: once as the ``### Available Parts``
-    block it reads, and once as the counter the gate enforces. Those must be
-    the same numbers, so the opening quantities are snapshotted here before the
-    gate starts spending them -- the gate mutates ``inventory`` in place, and
-    handing the live object to the prompt builder would make what the model was
-    told depend on when the string happened to be rendered.
-
     ``gate_cls`` lets a caller layer extra bookkeeping on the gate (the D-arm
     eval audits every sampled token) without rebuilding this pairing by hand.
     Constructing the gate at the call site is what let the two halves drift
@@ -122,8 +131,26 @@ def generate_with_inventory(
     Returns ``(Generation, gate)``. ``inventory`` is consumed; pass a copy if
     the caller still needs the opening position.
     """
-    opening = inventory.as_dict()
-    gate = gate_cls(gpt.slots, inventory)
-    gate.opening_inventory = opening
-    gen = gpt.generate(caption, inventory=opening, gate=gate, **kw)
-    return gen, gate
+    return _gated(gpt, caption, inventory, gate_cls,
+                  lambda g: g.generate, kw)
+
+
+def generate_raw_with_inventory(
+    gpt,
+    caption: str,
+    inventory: Inventory,
+    *,
+    gate_cls: type[InventoryGate] = InventoryGate,
+    **kw,
+):
+    """The same pairing, stopping before the parser.
+
+    Returns ``(RawGeneration, gate)``. This is what the execution node calls:
+    it decodes, and the parse, the checks and the LDraw write happen on the
+    Mac against the text it sends back. Sharing :func:`_gated` with
+    :func:`generate_with_inventory` is the point -- an independent second
+    copy of the snapshot-then-gate dance is exactly how the prompt and the
+    counter drift apart again, one layer down.
+    """
+    return _gated(gpt, caption, inventory, gate_cls,
+                  lambda g: g.generate_raw, kw)

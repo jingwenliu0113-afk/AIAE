@@ -50,7 +50,8 @@ TOKENS_PER_BRICK = 10
 # Re-exported so callers keep importing them from here; the definitions live
 # in src.generation.prompt so training data and inference cannot drift apart.
 __all__ = ["INSTRUCTION", "build_prompt", "BrickGPT", "BrickGate", "Slots",
-           "TOKENS_PER_BRICK", "sample", "parse_output", "Generation"]
+           "TOKENS_PER_BRICK", "sample", "parse_output", "Generation",
+           "RawGeneration"]
 
 
 def _refuse_locally_trained_adapter(adapter: str) -> None:
@@ -250,6 +251,30 @@ class BrickGate:
 
 
 @dataclass
+class RawGeneration:
+    """What the decoder produced, before anything interprets it.
+
+    The two layers exist because they run on different machines. Decoding
+    needs the GPU; the parser, the checkers and the LDraw writer need none of
+    it, and the project's rule is that a result is scored on the Mac. So the
+    execution node produces exactly this -- the text, how many tokens it cost,
+    how long it took, why it stopped -- and forms no opinion about whether any
+    of it is a brick.
+
+    Keeping the parse out of the node is not tidiness. A parse that happens
+    there happens under a different transformers, a different Python and a
+    different filesystem from the one that will be quoted in the report, and
+    the difference would be invisible: both sides produce a brick list.
+    """
+
+    text: str
+    n_tokens: int
+    seconds: float
+    truncated: bool
+    termination: str
+
+
+@dataclass
 class Generation:
     text: str
     bricks: list[Brick]
@@ -271,6 +296,7 @@ class BrickGPT:
         adapter_revision: str | None = ADAPTER_REVISION,
         tokenizer: str = TOKENIZER,
         tokenizer_revision: str | None = TOKENIZER_REVISION,
+        local_files_only: bool = False,
     ):
         """Three sources, three revisions, pinned independently.
 
@@ -292,17 +318,62 @@ class BrickGPT:
                 else "cpu"
             )
         self.device = device
-        self.tokenizer = load_tokenizer(tokenizer, tokenizer_revision)
+        self.tokenizer = load_tokenizer(tokenizer, tokenizer_revision,
+                                        local_files_only=local_files_only)
         model = AutoModelForCausalLM.from_pretrained(
-            base, revision=base_revision, dtype=dtype)
+            base, revision=base_revision, dtype=dtype,
+            local_files_only=local_files_only)
         if adapter:
             _refuse_locally_trained_adapter(adapter)
             from peft import PeftModel
 
             model = PeftModel.from_pretrained(
-                model, adapter, revision=adapter_revision)
+                model, adapter, revision=adapter_revision,
+                local_files_only=local_files_only)
         self.model = model.to(device).eval()
         self.slots = Slots.build(self.tokenizer)
+
+    @classmethod
+    def from_loaded(cls, model, tokenizer, *, device: str | None = None
+                    ) -> "BrickGPT":
+        """Wrap weights somebody else resolved, rather than resolving any.
+
+        Arms C and E run a locally trained adapter, and the only correct way
+        to build one is ``src.training.lora.load_finetuned``: base, then the
+        published adapter, then the merge, then the local delta. The
+        constructor above cannot express that -- it stacks an adapter onto the
+        bare base -- and reaching for ``BrickGPT(adapter=<local path>)``
+        because it is the obvious thing produces a model that loads, generates
+        and is wrong. ``_refuse_locally_trained_adapter`` catches that one
+        spelling; this is the route that makes the mistake unnecessary.
+
+        The same door serves arms B and D, which take
+        ``load_merged_brickgpt()``. That matters more than it looks: B/D and
+        C/E then differ by the local delta alone, rather than by the delta
+        *and* whether the published adapter was merged or left as a PEFT
+        wrapper.
+
+        Nothing is downloaded, moved between devices or cast here. ``device``
+        is read from the weights unless the caller states it, and a stated
+        value that disagrees is a refusal -- a tensor built on the wrong
+        device is a silent copy, not an error.
+        """
+        obj = cls.__new__(cls)
+        try:
+            actual = str(next(model.parameters()).device)
+        except StopIteration:                    # a stand-in with no weights
+            actual = None
+        if device is not None and actual is not None \
+                and not actual.startswith(device):
+            raise ValueError(
+                f"the model is on {actual!r} and the caller asked for "
+                f"{device!r}; refusing to generate on a device the weights "
+                "are not on")
+        obj.device = device or actual or "cpu"
+        obj.tokenizer = tokenizer
+        obj.model = model.eval() if hasattr(model, "eval") else model
+        obj.slots = Slots.build(tokenizer)
+        return obj
 
     def encode(
         self, caption: str, inventory: dict[str, int] | None = None
@@ -317,7 +388,7 @@ class BrickGPT:
         )
         return enc["input_ids"].to(self.device)
 
-    def generate(
+    def generate_raw(
         self,
         caption: str,
         *,
@@ -327,7 +398,7 @@ class BrickGPT:
         temperature: float = 0.6,
         seed: int | None = None,
         gate: BrickGate | None = None,
-    ) -> Generation:
+    ) -> RawGeneration:
         """Decode under ``gate``, one token at a time with a KV cache.
 
         Written as an explicit loop rather than ``model.generate`` with a
@@ -351,7 +422,15 @@ class BrickGPT:
         out: list[int] = []
         cur = ids
         past = None
-        t = time.time()
+        # A monotonic clock, not the wall clock. ``time.time()`` follows the
+        # system clock, and the system clock is adjusted: NTP steps it, and a
+        # WSL2 guest has it re-synchronised against the Windows host often
+        # enough that a decode can finish before it started. That is not a
+        # hypothetical -- one cell of one measured step came back with
+        # ``seconds = -0.5653038024902344`` and the sealer refused the step,
+        # correctly. ``perf_counter()`` cannot go backwards, so the duration
+        # is the duration whatever happens to the calendar mid-decode.
+        t = time.perf_counter()
 
         with torch.no_grad():
             for step in range(budget):
@@ -376,7 +455,7 @@ class BrickGPT:
                                   dim_value[out[-TOKENS_PER_BRICK + 2]])
                 cur = torch.tensor([[tok]], device=self.device)
 
-        seconds = time.time() - t
+        seconds = time.perf_counter() - t
         if gate.stop_reason == "running":
             # Which ceiling was hit matters: max_bricks means the structure
             # budget ran out, max_tokens that a raw token cap cut it short.
@@ -385,13 +464,44 @@ class BrickGPT:
             )
 
         text = self.tokenizer.decode(out, skip_special_tokens=True)
-        bricks, unparsed = parse_output(text)
-        return Generation(
+        return RawGeneration(
             text=text,
-            bricks=bricks,
             n_tokens=len(out),
             seconds=seconds,
             truncated=len(out) >= budget,
+            termination=gate.stop_reason,
+        )
+
+    def generate(
+        self,
+        caption: str,
+        *,
+        inventory: dict[str, int] | None = None,
+        max_bricks: int = 120,
+        max_tokens: int | None = None,
+        temperature: float = 0.6,
+        seed: int | None = None,
+        gate: BrickGate | None = None,
+    ) -> Generation:
+        """Decode and parse, exactly as before.
+
+        The signature, the return type and every field of it are unchanged:
+        this is :meth:`generate_raw` followed by :func:`parse_output`, which
+        is what the body used to do inline. Callers that want the two halves
+        on two machines take the halves; callers that want a brick list keep
+        calling this.
+        """
+        raw = self.generate_raw(
+            caption, inventory=inventory, max_bricks=max_bricks,
+            max_tokens=max_tokens, temperature=temperature, seed=seed,
+            gate=gate)
+        bricks, unparsed = parse_output(raw.text)
+        return Generation(
+            text=raw.text,
+            bricks=bricks,
+            n_tokens=raw.n_tokens,
+            seconds=raw.seconds,
+            truncated=raw.truncated,
             unparsed=unparsed,
         )
 

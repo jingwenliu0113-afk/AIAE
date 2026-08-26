@@ -331,6 +331,7 @@ def load_finetuned(
     dtype=torch.bfloat16,
     device: str = "mps",
     verify_digest: bool = True,
+    local_files_only: bool = False,
     _calls: list | None = None,
 ):
     """Cold-start a locally trained adapter, in the one order that is correct.
@@ -342,6 +343,13 @@ def load_finetuned(
     without complaint and emits plausible-looking bricks, so the mistake shows
     up as disappointing numbers rather than as an error -- which is why this
     function exists and why the manifest is checked rather than trusted.
+
+    ``local_files_only`` is passed explicitly, never read from the
+    environment, for the reason :func:`load_merged_brickgpt` gives: a measured
+    run either resolves every weight from the local cache or refuses, and
+    "did the operator export HF_HUB_OFFLINE" is not a property a measurement
+    should depend on. It defaults to ``False`` because the existing callers
+    are ordinary Mac evaluations; the core-acceptance runner passes ``True``.
     """
     from peft import PeftModel
 
@@ -372,8 +380,16 @@ def load_finetuned(
                 f"match the manifest ({manifest['adapter_sha256'][:12]}...); "
                 "the checkpoint changed after it was written")
 
-    merged, info = load_merged_brickgpt(dtype=dtype, _calls=_calls)
-    model = PeftModel.from_pretrained(merged, str(ckpt_dir))
+    merged, info = load_merged_brickgpt(dtype=dtype,
+                                        local_files_only=local_files_only,
+                                        _calls=_calls)
+    # The checkpoint is a directory on this machine, so nothing about it can
+    # reach the hub -- but the flag is passed anyway, because the value that
+    # matters is the one carried through to the base and published adapter
+    # above, and a reader checking "is this call strictly offline" should be
+    # able to see one answer rather than two.
+    model = PeftModel.from_pretrained(merged, str(ckpt_dir),
+                                      local_files_only=local_files_only)
     if _calls is not None:
         _calls.append(("local_adapter", str(ckpt_dir), None))
     model.to(device).eval()

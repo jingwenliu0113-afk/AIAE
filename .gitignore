@@ -43,6 +43,21 @@ data/reports/**/.*.lock
 #   data/reports/16_longrun/
 #   data/splits/
 
+# Gate run output: ledgers, checkpoints, optimizer state and saved adapters.
+# Per-machine runtime state, and on the execution node it lives inside the
+# training pack rather than in a repository at all. Ignored here for the same
+# reason the session locks above are: on this machine it can only ever be
+# self-test scratch, and one `git add -A` away from being committed.
+runs/
+
+# The materialised core-acceptance plan. It is derived from the test split --
+# 160 captions and inventories -- so it is per-record content and belongs
+# outside version control for the same reason data/processed/ does. It is
+# nonetheless on the private *pack* allowlist on purpose: the execution node
+# cannot generate without the prompts, and putting it anywhere the pack
+# verifier ignores (runs/) would make it swappable after the pack was audited.
+gpu_plans/
+
 # Never, in either tree
 *.gguf
 *.h5

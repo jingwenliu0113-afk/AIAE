@@ -18,7 +18,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.constraints.inventory_decode import InventoryGate
-from src.data.bricks import required_inventory
+from src.data.bricks import WORLD, required_inventory
 from src.generation.brickgpt import TOKENS_PER_BRICK, BrickGPT, Slots
 from src.generation.prompt import build_prompt
 from src.inventory.engine import Inventory
@@ -580,3 +580,117 @@ class TestOfflineTokenizerFailsClearly:
         self._declared(monkeypatch, Ok)
         B.load_tokenizer(local_files_only=True)
         assert asked == []
+
+
+class StubTokenizer:
+    """Enough tokenizer for the decode loop, and no download.
+
+    The clock tests must run on every machine, including one with a cold
+    Hugging Face cache, or the thing they prove is proved nowhere. Nothing
+    here touches the real vocabulary: the loop only needs ``encode`` to hand
+    it a prompt tensor and ``decode`` to turn ids back into a string.
+    """
+
+    eos_token_id = 2
+
+    def apply_chat_template(self, messages, **kw):
+        return {"input_ids": torch.tensor([[1, 1, 1]])}
+
+    def decode(self, ids, skip_special_tokens=True):
+        return " ".join(str(i) for i in ids)
+
+
+def stub_slots() -> Slots:
+    """Distinct ids per slot, which is all the gate and the loop require."""
+    return Slots(
+        dims=list(range(10, 10 + 8)),
+        posns=list(range(100, 100 + WORLD)),
+        literal_x=200, literal_open=201, literal_comma=202,
+        literal_close=203, eos=StubTokenizer.eos_token_id,
+    )
+
+
+class TestDecodeIsTimedByAMonotonicClock:
+    """The wall clock is adjusted; a duration measured against it is not one.
+
+    Not a hypothetical failure mode. One cell of one measured step on the
+    WSL2 execution node came back with ``seconds = -0.5653038024902344`` and
+    the sealer refused to close the step, which is what a frozen validator is
+    for. That machine's wall clock is re-synchronised against the Windows
+    host, so a decode could finish before it started. ``perf_counter()`` is
+    monotonic and cannot.
+    """
+
+    def decode(self, **kw):
+        slots = stub_slots()
+        script = brick_tokens(slots, 2, 4, 0, 0, 0) + [slots.eos]
+        gpt = object.__new__(BrickGPT)
+        gpt.device = "cpu"
+        gpt.tokenizer = StubTokenizer()
+        gpt.slots = slots
+        gpt.model = ScriptedModel(script)
+        gate = InventoryGate(slots, Inventory.from_parts({"2x4": 5}))
+        return gpt.generate_raw("x", gate=gate, max_bricks=10,
+                                temperature=0.6, **kw)
+
+    def test_seconds_is_the_perf_counter_span(self, monkeypatch):
+        """The number written is the difference of the two readings, as taken."""
+        import time
+
+        readings = iter([100.0, 100.25])
+        monkeypatch.setattr(time, "perf_counter", lambda: next(readings))
+        assert self.decode().seconds == pytest.approx(0.25)
+
+    def test_a_wall_clock_that_jumps_backwards_cannot_make_seconds_negative(
+            self, monkeypatch):
+        """The exact shape of the failure that stopped the batch."""
+        import time
+
+        # Backwards by more than half a second: what produced -0.5653.
+        wall = iter([1_787_000_000.0, 1_786_999_999.4])
+        monkeypatch.setattr(time, "time", lambda: next(wall))
+        perf = iter([500.0, 500.4])
+        monkeypatch.setattr(time, "perf_counter", lambda: next(perf))
+
+        raw = self.decode()
+        assert raw.seconds > 0
+        assert raw.seconds == pytest.approx(0.4)
+
+    def test_the_decode_loop_never_reads_the_wall_clock(self, monkeypatch):
+        """Not "it survives a jump" but "it never asks the clock that jumps"."""
+        import time
+
+        called = []
+        monkeypatch.setattr(time, "time",
+                            lambda: called.append(1) or 0.0)
+        self.decode()
+        assert called == []
+
+    def test_the_source_names_only_the_monotonic_clock(self):
+        """A second call site added later would reintroduce the bug."""
+        import inspect
+
+        src = inspect.getsource(BrickGPT.generate_raw)
+        body = "\n".join(line for line in src.splitlines()
+                         if not line.lstrip().startswith("#"))
+        assert "time.perf_counter()" in body
+        assert "time.time()" not in body
+
+    def test_text_tokens_and_termination_are_unchanged_by_the_clock(
+            self, monkeypatch):
+        """Timing is measurement, not behaviour: same seed, same output."""
+        import time
+
+        plain = self.decode(seed=7)
+
+        wall = iter([1_787_000_000.0, 1_786_999_990.0])
+        monkeypatch.setattr(time, "time", lambda: next(wall))
+        perf = iter([9.0, 9.75])
+        monkeypatch.setattr(time, "perf_counter", lambda: next(perf))
+        skewed = self.decode(seed=7)
+
+        assert skewed.text == plain.text
+        assert skewed.n_tokens == plain.n_tokens
+        assert skewed.termination == plain.termination
+        assert skewed.truncated == plain.truncated
+        assert skewed.seconds == pytest.approx(0.75)

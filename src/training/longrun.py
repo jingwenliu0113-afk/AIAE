@@ -82,6 +82,19 @@ LENGTHS = (500, 1000, 2000)
 RUN_IDS = ("b1", "b2", "b3")
 CONDITION = "empty_cache"
 POOL_PAIRS, ROWS_PER_PAIR, POOL_ROWS, SEED = 250, 8, 2000, 0
+
+#: The two row sources this loader can read, and nothing else.
+#:
+#: ``pool`` is the frozen 250-pair, 2,000-row sample every measurement in the
+#: project so far has used -- reports 15 and 16, the gates, and both hypothesis
+#: arms. ``full_train`` is the whole training split, which only the final run
+#: reads. Both are declared here with the shape they must have and are checked
+#: against the file, so a split that changed size is a refusal rather than a
+#: quietly shorter run.
+DATA_SOURCES: dict[str, dict] = {
+    "pool": {"pairs": POOL_PAIRS, "rows": POOL_ROWS},
+    "full_train": {"pairs": 1198, "rows": 9584},
+}
 WINDOW, SECONDARY_AGGREGATION, MEMORY_EVERY, EMPTY_CACHE_EVERY = 20, 100, 5, 10
 MIN_ROWS = {"D100": 200, "D20": 40, "Dmax": 120, "clear_growth": 400}
 CLEAR_GROWTH_MIN_CALLS, GROWTH_SEGMENT = 40, 20
@@ -145,19 +158,40 @@ def provenance_problems(provenance, *, declared_rows) -> list[str]:
     if missing:
         problems.append(f"provenance is missing {missing}")
     if "measurement_intervals" in provenance:
-        intervals = provenance["measurement_intervals"]
-        if not isinstance(intervals, dict):
-            problems.append(f"measurement_intervals is "
-                            f"{type(intervals).__name__}, not an object")
-        elif "max_rows" not in intervals:
-            problems.append("measurement_intervals records no max_rows, so the "
-                            "one value allowed to differ between runs is not "
-                            "written down")
-        elif intervals["max_rows"] != declared_rows:
-            problems.append(
-                f"measurement_intervals.max_rows is {intervals['max_rows']!r}, "
-                f"not this run's declared {declared_rows!r}")
+        # Absence is already reported by the ``missing`` check above, so this
+        # only asks whether the block that is there says the right thing.
+        problems += measurement_interval_problems(
+            provenance["measurement_intervals"], declared_rows=declared_rows)
     return problems
+
+
+def measurement_interval_problems(intervals, *, declared_rows) -> list[str]:
+    """Does this ``measurement_intervals`` block declare this run's length?
+
+    Split out because it has two callers with different ideas about whether
+    the block may be absent: this module's provenance check reports absence
+    through its own required-fields list, while the gate suite requires it
+    outright. What "a good block" means is one fact, and it is this one.
+
+    ``max_rows`` is required to be a strict ``int``. ``100.0 == 100`` and
+    ``True == 1`` in Python, so a plain comparison accepts a float and a
+    boolean as row counts -- and a provenance field that accepts ``True`` is
+    not recording anything.
+    """
+    if not isinstance(intervals, dict):
+        return [f"measurement_intervals is {type(intervals).__name__}, not an "
+                "object"]
+    if "max_rows" not in intervals:
+        return ["measurement_intervals records no max_rows, so the one value "
+                "allowed to differ between runs is not written down"]
+    value = intervals["max_rows"]
+    if isinstance(value, bool) or not isinstance(value, int):
+        return [f"measurement_intervals.max_rows is {value!r}, a "
+                f"{type(value).__name__} rather than a whole number of rows"]
+    if value != declared_rows:
+        return [f"measurement_intervals.max_rows is {value!r}, not this run's "
+                f"declared {declared_rows!r}"]
+    return []
 
 
 EVENT_GATE_ATTEMPT = "gate_attempt"
@@ -346,6 +380,67 @@ def dependency_preflight() -> dict:
             "sha256": sha256_file(pool) if pool.exists() else None},
     }
     return {"ok": not problems, "problems": problems, "evidence": evidence}
+
+
+#: The dependency digest's own identity, mixed into the value so a digest of
+#: this evidence can never collide with a digest of something else shaped
+#: like it.
+DEPENDENCY_DIGEST_KIND = "brickagain.dependency_digest"
+DEPENDENCY_DIGEST_VERSION = 1
+
+
+def dependency_digest(evidence) -> str:
+    """One canonical value over *which bytes* the pinned dependencies are.
+
+    :func:`dependency_preflight` already answers "is every pinned file here".
+    It cannot answer "is it the same file", and the difference matters: a
+    ``tokenizer.json`` of the correct name resolves perfectly well whatever is
+    inside it, and a run against a vocabulary nobody compared is a run whose
+    numbers are not comparable with anything.
+
+    So this digests the portable evidence -- repository id, pinned revision,
+    and every required file's name, size and digest, plus the instruction
+    pool's repository-relative path and digest -- and nothing else. Three
+    consequences, each deliberate:
+
+    * **order cannot change it.** Repositories are sorted by their own
+      canonical form and files by name and digest, so a hub that enumerates
+      differently on two machines still produces one value. The two entries
+      that share a repository id -- the tokenizer and the published adapter
+      come from the same repo -- stay separate entries rather than being
+      merged by id, because their file sets are what distinguish them;
+    * **incidental fields cannot change it.** ``network_used`` and the rest
+      describe the *reading*, not the dependencies. Including them would make
+      the digest depend on how it was taken;
+    * **absent evidence still digests.** An empty or missing block produces a
+      value, and one no populated cache can match. A comparison that raised
+      instead would turn a refusal into a crash.
+
+    Deliberately *not* stored in the pack manifest: a digest kept beside the
+    files it authenticates is rewritten by whoever rewrites them. Like
+    ``pack_digest``, it is carried to the node by a separate route.
+    """
+    body = evidence if isinstance(evidence, dict) else {}
+    repositories = []
+    for repo in body.get("repositories") or []:
+        if not isinstance(repo, dict):
+            continue
+        files = [{"name": f.get("name"), "bytes": f.get("bytes"),
+                  "sha256": f.get("sha256")}
+                 for f in (repo.get("files") or []) if isinstance(f, dict)]
+        files.sort(key=lambda f: (str(f["name"]), str(f["sha256"])))
+        repositories.append({"repo_id": repo.get("repo_id"),
+                             "revision": repo.get("revision"),
+                             "files": files})
+    repositories.sort(key=canonical_json)
+    pool = body.get("instruction_pool") or {}
+    return digest_obj({
+        "kind": DEPENDENCY_DIGEST_KIND,
+        "schema_version": DEPENDENCY_DIGEST_VERSION,
+        "repositories": repositories,
+        "instruction_pool": {"path": pool.get("path"),
+                             "sha256": pool.get("sha256")},
+    })
 
 
 #: What a run leaves behind when the child dies without writing a report.
@@ -3879,8 +3974,31 @@ class ProductionChildDeps(ChildDeps):
     would arrive after a boot had already been spent.
     """
 
-    def __init__(self, *, device: str = "mps"):
+    def __init__(self, *, device: str = "mps", cfg=None,
+                 source: str = "pool"):
         self.device = device
+        # Which rows to read. ``pool`` is the default and is what every
+        # measurement so far used; ``full_train`` is the whole split and is
+        # read only by the final run. Named rather than sized: a caller that
+        # could pass a row count could pass a different experiment.
+        if source not in DATA_SOURCES:
+            raise ValueError(
+                f"{source!r} is not one of {sorted(DATA_SOURCES)}; this loader "
+                "reads the frozen pool or the whole training split, and "
+                "nothing in between")
+        self.source = source
+        # The configuration to build with. ``None`` means the project default,
+        # which is what every measurement so far has used. It is injectable
+        # only because H1 and H2 are two *frozen* configurations that differ in
+        # rank, alpha and learning rate, and a loader that could not be told
+        # which one to build would need a second loader -- which is how the
+        # two arms would end up differing in something nobody chose.
+        #
+        # This is not an override hole: the only caller that passes anything
+        # is :mod:`src.training.arms`, and it gets the value from
+        # :func:`src.training.hypotheses.config_for` and from nowhere else.
+        # No command line reaches this.
+        self._cfg = cfg
 
     def load(self, *, rows: int) -> dict:
         # First statement in the function, ahead of every import below, and
@@ -3916,18 +4034,28 @@ class ProductionChildDeps(ChildDeps):
                                        build_model, collate, encode_row,
                                        read_rows, sample_pairs)
 
-        cfg = LoraConfig_()
+        cfg = self._cfg if self._cfg is not None else LoraConfig_()
         # Strictly local, stated rather than inherited: a measured run either
         # resolves every byte from this machine's cache or refuses. It does
         # not discover halfway through a spent boot that a name has to be
         # looked up.
         tok = load_tokenizer(local_files_only=True)
+        shape = DATA_SOURCES[self.source]
         pool = sample_pairs(read_rows(ROOT / "data" / "processed"
                                       / "instruct_inv_train.jsonl"),
-                            n_pairs=POOL_PAIRS, seed=cfg.seed)
-        if len(pool) != POOL_ROWS:
-            raise ValueError(f"the pool holds {len(pool)} rows, not {POOL_ROWS}")
+                            n_pairs=shape["pairs"], seed=cfg.seed)
+        if len(pool) != shape["rows"]:
+            raise ValueError(
+                f"the {self.source} source holds {len(pool)} rows, not the "
+                f"declared {shape['rows']}")
         encs = [encode_row(tok, r, cfg.max_length) for r in pool]
+        # Counted here, where the encoder is, and handed to the caller.
+        # Truncation is silent by construction -- a truncated row trains on a
+        # target that stops mid-structure and reports a perfectly ordinary
+        # loss -- so the reading has to travel with the loader rather than be
+        # recomputed by whoever remembers to.
+        truncated_rows = sum(1 for e in encs if e.truncated)
+        max_total_tokens = max(len(e.input_ids) for e in encs)
 
         # One permutation over the whole pool, computed once from the frozen
         # seed, and only then truncated. b1/b2/b3 are prefixes of the same
@@ -3987,11 +4115,23 @@ class ProductionChildDeps(ChildDeps):
             "trainable_parameters": info.get("trainable_parameters"),
         }
         return {"order": order, "step": step, "provenance": provenance,
+                "data_source": self.source,
+                "truncated_rows": truncated_rows,
+                "max_total_tokens": max_total_tokens,
                 "sample_ids": [pool[i].sample_id for i in order],
                 "model_load_seconds": prepared["model_load_seconds"],
                 "teardown": make_teardown(torch, holder),
                 "clear": lambda: _empty_cache(torch),
-                "probe": _driver_probe(torch)}
+                "probe": _driver_probe(torch),
+                # Additive, and only for callers that have to reach the model
+                # itself -- the gate runner saves the adapter and the optimizer
+                # state, which nothing here measures. Report 16 ignores it:
+                # ``child_load_problems`` checks the fields it requires and is
+                # indifferent to extra ones. The alternative was a second
+                # loader with a second copy of the provenance block above, and
+                # two places for "which weights was this" to be defined is
+                # exactly one too many.
+                "holder": holder}
 
 
 class FakeChildDeps(ChildDeps):
@@ -4065,11 +4205,29 @@ def _digest_ids(ids) -> str:
     return h.hexdigest()
 
 
+def _mps_available(torch) -> bool:
+    """Is there an MPS *backend*, not merely an MPS attribute?
+
+    ``torch.mps`` and ``torch.mps.empty_cache`` exist on every build,
+    including CUDA ones -- they are present and they raise. The node found
+    this the only way it could be found: the Mac has a real MPS backend, so
+    the attribute check is accidentally correct here and wrong everywhere
+    else.
+    """
+    try:
+        return bool(torch.backends.mps.is_available())
+    except Exception:
+        # A torch that cannot answer is treated as "no". An unavailable
+        # answer is not a yes, and guessing yes is what raised on the node.
+        return False
+
+
 def _empty_cache(torch) -> float:
     import time
 
     t0 = time.perf_counter()
-    if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+    if _mps_available(torch) and hasattr(getattr(torch, "mps", None),
+                                         "empty_cache"):
         torch.mps.empty_cache()
     return time.perf_counter() - t0
 

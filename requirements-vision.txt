@@ -1,0 +1,32 @@
+# Optional dependencies for the vision and retrieval paths, pinned.
+#
+# Every version here is already installed for this project, and the file exists
+# so the vision path's requirements are stated separately rather than inferred
+# from the core list. Nothing new is introduced: the eight-class classifier
+# runs on the transformers build that is already pinned, and the multilingual
+# embedding loads through AutoModel rather than through sentence-transformers,
+# which is deliberately absent.
+#
+# The core parser, inventory engine, CP-SAT re-tiler, LDraw writer, delivery
+# path, existing UI and their tests import and pass without any of this. Every
+# heavy import in src/vision and src/retrieval happens inside the function that
+# needs it, and there is a test that asserts so.
+#
+#   ./.venv/bin/pip install -r requirements-vision.txt
+
+torch==2.13.0
+transformers==5.15.0
+huggingface_hub==1.27.0
+tokenizers==0.22.2
+safetensors==0.8.0
+numpy==2.5.2
+pillow==12.3.0
+matplotlib==3.11.1
+
+# The pinned models, for the record. Not installable by pip; fetched once with
+#   ./.venv/bin/python scripts/32_vision_train.py --fetch-backbone
+#   ./.venv/bin/python scripts/34_rag_index.py --fetch-model
+# and every later run is strict-offline.
+#
+#   microsoft/resnet-18                @ 65a5785d9156231087c481e0c7dd33a5ff6f7e3e   apache-2.0
+#   intfloat/multilingual-e5-small      @ 614241f622f53c4eeff9890bdc4f31cfecc418b3   mit
