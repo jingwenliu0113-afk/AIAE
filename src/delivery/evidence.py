@@ -145,8 +145,10 @@ def sealed_delivery_summary(root: str | Path) -> dict:
                 "from one fixed run, not a pre-frozen tau/rho/removal sweep"),
         },
         "phase_3_placement": (
-            "rules and implementation reviewed; never formally evaluated, "
-            "so no metric is attached"),
+            "rules and implementation reviewed; evaluated once in Phase 3C "
+            "gen09 and the direction was against it -- Core Success@4 "
+            "-5.0pp, 95% interval [-9.4, -0.6] -- so no metric from this "
+            "delivery is attached"),
         "research_track": "closed; missing experiments are not a backlog",
     }
 

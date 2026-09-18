@@ -1,4 +1,8 @@
 .venv/
+# The presentation build environment, created from
+# presentation/requirements-presentation.txt. A virtualenv is a build
+# product, not a record of one.
+.venv-presentation/
 __pycache__/
 *.pyc
 data/raw/
@@ -58,8 +62,96 @@ runs/
 # verifier ignores (runs/) would make it swappable after the pack was audited.
 gpu_plans/
 
+# Third-party runtimes. The V2 PBR track pins a Blender install by digest;
+# the installer itself is a ~400 MB third-party binary, so the *record* of it
+# (version, DMG SHA-256, the official checksum file and where it came from) is
+# tracked and the binary is not. Kept on disk rather than re-downloaded so a
+# replay does not depend on a release directory staying up.
+artifacts/runtime/
+
 # Never, in either tree
 *.gguf
 *.h5
 *.msgpack
 .hf_home/
+
+# BrickNet extension: the derived corpora, not the records of them.
+#
+# `pt_sample.jsonl` is 907 MB and `train.jsonl` 59 MB, both derived from the
+# author's gated dataset -- per-record content, excluded for the same reason
+# `data/processed/` is. Their manifests, which carry the SHA-256, the selection
+# rule and the row counts, *are* tracked: the record of a dataset is what makes
+# it checkable, and it is small.
+data/bricknet/instruct/*.jsonl
+data/bricknet/instruct_all/*.jsonl
+data/bricknet/pt/*.jsonl
+data/bricknet/catalog/*.jsonl
+
+# Transport packs for the Taichung node. Build outputs, not evidence: their
+# bytes are reproducible from the dataset plus the pack_digest, and the data
+# pack carries derivatives of the author's gated dataset, which do not go into
+# Git (CLAUDE.md, decision 5). The *frozen* packs that are evidence --
+# artifacts/bricknet/evalpack_frozen and the evidence_* archives -- stay
+# tracked, so this is deliberately narrow.
+artifacts/bricknet/pack_scale_code/
+artifacts/bricknet/pack_scale_data/
+artifacts/bricknet/product_node_pack_v1/
+artifacts/bricknet/product_node_pack_v2/
+artifacts/bricknet/product_node_pack_v3/
+artifacts/bricknet/product_node_pack_v4/
+artifacts/bricknet/product_return_v3/
+artifacts/bricknet/product_diagnostic_v3/brickagain_generated_taichung.json
+
+# Per-slide renders of presentation/deck/brickagain_showcase.pptx. They are a
+# check, not a deliverable: `presentation/tools/render_deck.py` rebuilds them
+# from the .pptx in seconds, and render_manifest.json keeps the result of the
+# check that used them. 4 MB of bitmaps that a command regenerates is not
+# evidence worth versioning.
+presentation/deck/render/
+
+# Local recovery copies and private audit scratch files, never publish.
+artifacts/codex-backup-20260907/
+
+# Local upstream installation; never include in a product/source commit.
+/BrickNet-master/
+
+# Editable local package metadata
+/brickagain_local.egg-info/
+
+# Photo-recognition track: the payload, not the record of it.
+#
+# `data/bricknet/photo/shards/` holds the rendered PNG corpus -- about 14.6 GiB
+# at full scope -- which is derived content in the same sense `data/processed/`
+# is. Each shard's `manifest.json` and `labels.jsonl` are what make it
+# checkable and are small, so they are excluded from this rule below.
+#
+# `artifacts/bricknet/photo/checkpoints/` holds what the node *trains*. Its
+# weights are already caught by `*.safetensors`, but the directory is named so
+# that an optimizer state file or a tokenizer config landing beside them is not
+# one `git add -A` from being committed.
+#
+# `artifacts/bricknet/photo/weights/` holds the two fetched third-party
+# backbones. Same treatment as artifacts/runtime/: the *record* of them --
+# repository, revision, licence and per-file SHA-256 in
+# data/reports/bricknet/photo/01_weights.json -- is tracked, and the bytes,
+# including their config.json, are not.
+# Written as `/**` with the directories re-included rather than as
+# `shards/`: git does not descend into an excluded *directory*, so a negation
+# for a file inside one never gets a chance to match. Checked, not assumed --
+# the first spelling ignored manifest.json as well.
+data/bricknet/photo/shards/**
+!data/bricknet/photo/shards/
+!data/bricknet/photo/shards/*/
+!data/bricknet/photo/shards/*/manifest.json
+!data/bricknet/photo/shards/*/labels.jsonl
+# The OptiX corpus, under its own directory because the one above is retired
+# evidence and may not be rendered into. Its retirement notice is small and
+# is the record of that decision, so it is tracked.
+!data/bricknet/photo/shards/SUPERSEDED.json
+data/bricknet/photo/shards_optix/**
+!data/bricknet/photo/shards_optix/
+!data/bricknet/photo/shards_optix/*/
+!data/bricknet/photo/shards_optix/*/manifest.json
+!data/bricknet/photo/shards_optix/*/labels.jsonl
+artifacts/bricknet/photo/checkpoints/
+artifacts/bricknet/photo/weights/

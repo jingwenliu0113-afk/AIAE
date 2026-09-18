@@ -161,6 +161,11 @@ PACK_DENY: tuple[tuple[str, str], ...] = (
         ("src/ui", "the interface, including an HTTP server"),
         ("src/demo", "the demonstration entry point"),
         ("src/delivery", "the delivery pipeline"),
+        ("src/bricknet_ext",
+         "the BrickNet extension: a second arm over real LDraw parts with its "
+         "own vocabulary, its own data and its own pack. Nothing the node runs "
+         "imports it, and it would put derivatives of a gated dataset inside "
+         "the BrickGPT training payload"),
     )),
     ("src/rendering/preview.py",
      "the Matplotlib preview; not reachable from the fit and it would pull an "
@@ -172,6 +177,11 @@ PACK_DENY: tuple[tuple[str, str], ...] = (
 NON_PACKED_SUBTREES: tuple[str, ...] = (
     "src/vision", "src/retrieval", "src/colour", "src/assembly",
     "src/ui", "src/demo", "src/delivery",
+    # The BrickNet extension is a second arm with its own vocabulary, its own
+    # data and its own pack (scripts/41_bricknet_pack.py). Nothing this pack's
+    # entry points run reaches it, and carrying it here would put the gated
+    # dataset's derivatives inside the BrickGPT training payload.
+    "src/bricknet_ext",
 )
 
 #: The entry points whose import closure the payload has to cover. Both the
@@ -185,6 +195,7 @@ PACK_ENTRY_POINTS: tuple[str, ...] = (
     "scripts/20_hypothesis_run.py",
     "scripts/22_final_train.py",
     "scripts/25_core_eval.py",
+    "scripts/59_phase3c.py",
     "tests/test_pack.py",
     "tests/test_gpu_node.py",
     "tests/test_gates.py",
@@ -328,7 +339,84 @@ PACK_ALLOW: tuple[str, ...] = (
     # own verifier walks past -- swappable after the pack was audited, with
     # every digest still agreeing. Here it is a manifest entry like any other.
     "gpu_plans/core_eval_plan.json",
+
+    # Phase 3C's entry point, on the same terms as module 25. Its ``--run``
+    # and ``--seal`` modes are the node's whole job for arms A, B and C; its
+    # ``--materialize`` mode is unusable here because the test split it would
+    # read is not in ``REQUIRED_DATA`` and never arrives, and its
+    # ``--authorize``, ``--score`` and ``--report`` modes refuse on any
+    # machine that is not the Mac.
+    "scripts/59_phase3c.py",
+
+    # Two files from the current Phase 3C generation, and only two.
+    #
+    # The plan carries nine fields per case -- sample_id, pair_id, case_id,
+    # role, variant, caption, inventory, inventory_digest, prompt_sha256 --
+    # and no target, no reference bricks and no used-parts column; the same
+    # ``plan_leak_problems`` that guards Phase 2's plan refuses those by name
+    # and by running the brick parser over every string in it.
+    #
+    # The execution authorization is what makes the node's own checks mean
+    # something: it names the pack digest, the dependency digest and the
+    # SHA-256 of every module the decode path can reach, so the node
+    # recomputes them and refuses rather than accepting whatever it is told.
+    #
+    # The membership and the audit deliberately **do not** travel. The plan
+    # names their digests, and the plan itself is bound by the
+    # authorization, so a node cannot widen the case list without producing
+    # a plan whose digest the Mac carried separately. Sending them anyway
+    # would put more of the test split on the node for no check it enables.
+    # The staged *plan*, and only the plan.
+    #
+    # Not the archive itself: ``build`` refuses anything under ``data/`` as a
+    # last check over its own deny table, and that check is worth more than
+    # having one location. So the archive is the record and this is a
+    # write-once copy of it, which ``phase3c.staged_copy_problems`` and a
+    # test hold to the archive's exact bytes.
+    #
+    # And **not the execution authorization**, for the reason GPU_NODE.md
+    # already gives about ``pack_digest``: the authorization names the digest
+    # of this pack, so shipping it inside this pack would put the value and
+    # the thing it authenticates in the same parcel, where whoever can edit
+    # one can edit the other. It travels by hand, like the two digests do,
+    # and the node is pointed at it with ``--authorization``.
+    #
+    # The staged plan is **not named here**, and this is the third design of
+    # that binding. See :data:`PHASE3C_STAGED_POINTER`.
 )
+
+#: Where the current Phase 3C staged plan is declared, as data rather than as
+#: a literal in this module.
+#:
+#: **The cycle this exists to break.** Until gen05 the current generation's
+#: staged plan was written into :data:`PACK_ALLOW` by name, so bumping the
+#: Phase 3C generation edited *this file*. But this file is inside the import
+#: closure of the V1 visual run, whose frozen ``source_manifest`` pins its
+#: SHA-256 -- so every Phase 3C bump invalidated V1's stored runs. Re-freezing
+#: V1 to repair that edits ``src/eval/visual_stress.py``, which the Phase 3C
+#: pack carries, which invalidates the Phase 3C pack digest and the
+#: authorization that binds it. Each repair broke the other. gen05 was frozen
+#: into that cycle and is superseded by it, unexecuted.
+#:
+#: So the generation is data now. This module names a fixed path that never
+#: changes; the file at that path names the generation, the staged plan and
+#: that plan's SHA-256; and :func:`staged_phase3c_plan` refuses unless the
+#: three agree with each other and with the bytes on disk. A Phase 3C
+#: generation bump rewrites that file and does not touch a byte of this one.
+#:
+#: Deliberately **not** a glob. ``gpu_plans/`` keeps every superseded
+#: generation's staged copy, so a pattern would match several files and the
+#: pack would either carry the wrong plan or carry more than one. The pointer
+#: names exactly one, and :func:`build` refuses if any other staged plan
+#: reaches the include list.
+PHASE3C_STAGED_POINTER = "gpu_plans/phase3c_staged.json"
+
+#: The shape a staged Phase 3C plan's name has. Used to *detect* candidates so
+#: extras can be refused -- never to select one.
+PHASE3C_PLAN_GLOB = "gpu_plans/phase3c_*_plan.json"
+
+#: What the pointer must say it is.
+PHASE3C_POINTER_KIND = "brickagain.phase3c_staged_plan"
 
 #: The self-contained suites, named once. Both the allowlist above and the
 #: test that guards it read this rather than each keeping its own copy.
@@ -639,12 +727,91 @@ def _matches(rel: str, pattern: str) -> bool:
     return snapshot_module()._matches(str(rel), pattern)
 
 
-def classify(rel: str) -> tuple[str, str]:
-    """``(verdict, reason)`` for one repository-relative path."""
+def staged_phase3c_plan(root=None) -> tuple[str | None, list[str]]:
+    """The one staged Phase 3C plan the pointer names, or why there is none.
+
+    Fails closed in every direction a pointer can be wrong: absent,
+    unreadable, the wrong kind, missing a field, naming a generation its own
+    filename does not carry, naming a file that is not here, or naming bytes
+    whose SHA-256 is not the one it declares. Returns ``(None, problems)`` in
+    all of them, so a caller that ignores the problems packs nothing rather
+    than packing something unchecked.
+    """
+    root = Path(root or ROOT)
+    path = root / PHASE3C_STAGED_POINTER
+    if not path.is_file():
+        return None, [f"{PHASE3C_STAGED_POINTER} is not here, so no Phase 3C "
+                      "plan is staged and none may travel"]
+    try:
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, [f"{PHASE3C_STAGED_POINTER} is not readable JSON "
+                      f"({exc})"]
+    if not isinstance(body, dict):
+        return None, [f"{PHASE3C_STAGED_POINTER} is not an object"]
+    if body.get("kind") != PHASE3C_POINTER_KIND:
+        return None, [f"{PHASE3C_STAGED_POINTER} says kind "
+                      f"{body.get('kind')!r}, not {PHASE3C_POINTER_KIND!r}"]
+
+    problems: list[str] = []
+    generation = body.get("generation")
+    rel = body.get("staged_plan")
+    declared = body.get("plan_sha256")
+    if not isinstance(generation, str) or not generation:
+        problems.append(f"{PHASE3C_STAGED_POINTER} names no generation")
+    if not isinstance(rel, str) or not rel:
+        problems.append(f"{PHASE3C_STAGED_POINTER} names no staged_plan")
+    if not isinstance(declared, str) or len(declared) != 64 \
+            or any(c not in "0123456789abcdef" for c in declared.lower()):
+        problems.append(f"{PHASE3C_STAGED_POINTER} carries a plan_sha256 "
+                        "that is not a SHA-256")
+    if problems:
+        return None, problems
+
+    problems += path_problems(rel, field="staged_plan")
+    # The name and the generation have to agree. A pointer that said gen06
+    # and named gen05's file would ship the superseded plan under the current
+    # generation's authority, which is the whole failure this replaces.
+    expected = f"gpu_plans/phase3c_{generation}_plan.json"
+    if rel != expected:
+        problems.append(
+            f"{PHASE3C_STAGED_POINTER} says generation {generation!r} and "
+            f"names {rel!r}; a pointer for that generation names {expected!r}")
+    if problems:
+        return None, problems
+
+    plan = root / rel
+    if not plan.is_file():
+        return None, [f"{PHASE3C_STAGED_POINTER} names {rel}, which is not "
+                      "here; stage before building"]
+    actual = sha256_file(plan)
+    if actual != declared:
+        return None, [
+            f"{rel} digests to {actual[:16]}..., and "
+            f"{PHASE3C_STAGED_POINTER} declares {declared[:16]}.... The "
+            "pointer and the file it points at are not the same document."]
+    return rel, []
+
+
+def classify(rel: str, *, staged_plan: str | None = None) -> tuple[str, str]:
+    """``(verdict, reason)`` for one repository-relative path.
+
+    ``staged_plan`` is the single Phase 3C plan :func:`staged_phase3c_plan`
+    resolved for this tree. It is passed in rather than read here so that one
+    walk resolves the pointer once, and so a caller that has not resolved it
+    cannot accidentally include a plan: with no ``staged_plan`` every
+    candidate is excluded.
+    """
     rel = str(rel)
     for pattern, why in PACK_DENY:
         if _matches(rel, pattern):
             return "exclude", f"denied by {pattern!r}: {why}"
+    if staged_plan is not None and rel == staged_plan:
+        return "include", (f"the staged Phase 3C plan named by "
+                           f"{PHASE3C_STAGED_POINTER}")
+    if _matches(rel, PHASE3C_PLAN_GLOB):
+        return "exclude", (f"a staged Phase 3C plan that "
+                           f"{PHASE3C_STAGED_POINTER} does not name")
     for pattern in PACK_ALLOW:
         if _matches(rel, pattern):
             return "include", f"allowed by {pattern!r}"
@@ -675,6 +842,10 @@ def manifest(root: Path | None = None) -> dict[str, list]:
     """
     root = Path(root or ROOT)
     pruned = _prunable_dirs()
+    # Resolved once, for the whole walk. If the pointer does not hold, every
+    # staged plan classifies as excluded and :func:`build` refuses with the
+    # pointer's own problems rather than quietly shipping a pack with no plan.
+    staged, _problems = staged_phase3c_plan(root)
     out: dict[str, list] = {"include": [], "exclude": []}
     for dirpath, dirnames, filenames in os.walk(root):
         rel_dir = str(Path(dirpath).relative_to(root))
@@ -697,7 +868,7 @@ def manifest(root: Path | None = None) -> dict[str, list]:
         dirnames[:] = keep
         for name in sorted(filenames):
             rel = f"{rel_dir}/{name}" if rel_dir else name
-            verdict, reason = classify(rel)
+            verdict, reason = classify(rel, staged_plan=staged)
             path = root / rel
             try:
                 size = path.stat().st_size
@@ -839,6 +1010,36 @@ def build(dest, root=None) -> dict:
             problems.append(
                 f"{rel} reached the include list; no path under {top}/ may "
                 "travel in a pack")
+
+    # The staged Phase 3C plan: exactly one, and exactly the one the pointer
+    # names. Checked here as well as in :func:`classify` because this is the
+    # assertion that would catch an editing mistake in ``classify`` itself.
+    #
+    # Only where there is something to check. A tree with no pointer and no
+    # staged plan has no Phase 3C generation to get wrong, and the synthetic
+    # trees this function is tested against are exactly that. "This tree has
+    # a Phase 3C plan and it is the authorised one" is not a question pack
+    # can answer -- ``phase3c.pack_carries_this_generation_problems`` answers
+    # it at authorisation time, from the file table, where the generation is
+    # known.
+    staged_on_disk = sorted(
+        str(p.relative_to(root)).replace("\\", "/")
+        for p in (root / "gpu_plans").glob("phase3c_*_plan.json")
+    ) if (root / "gpu_plans").is_dir() else []
+    if (root / PHASE3C_STAGED_POINTER).is_file() or staged_on_disk:
+        staged, staged_problems = staged_phase3c_plan(root)
+        problems += staged_problems
+        candidates = sorted(r for r in included
+                            if _matches(r, PHASE3C_PLAN_GLOB))
+        if staged is not None and candidates != [staged]:
+            problems.append(
+                f"the include list carries {candidates} as staged Phase 3C "
+                f"plans; {PHASE3C_STAGED_POINTER} names {staged!r} and only "
+                "that one may travel")
+        elif staged is None and candidates:
+            problems.append(
+                f"the include list carries {candidates} and no pointer "
+                "resolved; a plan nobody named is a plan nobody authorised")
     if problems:
         raise PackRefused("refusing to build the pack:\n  - "
                           + "\n  - ".join(problems))

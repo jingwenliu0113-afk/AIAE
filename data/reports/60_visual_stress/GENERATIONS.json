@@ -1,0 +1,106 @@
+{
+  "current": "gen08",
+  "current_artefacts": "data/reports/60_visual_stress/gen08_{cv,learned}__*",
+  "kind": "brickagain.visual_stress_generations",
+  "note": "Every superseded generation stays exactly as it was written. None can be re-derived by the current code -- gen01 predates the metric rename and the checkpoint provenance, gen02 predates the computed source closure and the manifest-bound runtime, gen03 predates the per-image result digest and the deterministic replay, and gen04 predates the pointer that keeps the Phase 3C generation out of src/training/pack.py, which its own source manifest pins -- which is why each is superseded rather than corrected in place.\n\nThe V1 visual run's generation and its recogniser declaration, as data rather than as literals in src/eval/visual_stress.py.\n\nThe cycle this exists to break, which is the mirror of the one src/training/pack.py already cut. src/eval/visual_stress.py is one of the 60 files the Phase 3C pack carries, and Phase 3C gen09's pack evidence pins every one of them by SHA-256. So bumping the V1 generation -- which the module used to hold as a literal -- edited a file that archive pins, and invalidated it. pack.py cut the other direction (a Phase 3C bump used to edit pack.py, which V1's closure pins); this cuts this one. data/** is not in the pack, so a bump rewrites this file and leaves every packed module byte-identical.",
+  "recogniser": {
+    "learned_source_files": [
+      "src/vision/model.py",
+      "src/vision/classes.py",
+      "src/vision/schema.py",
+      "src/vision/model_ids.py"
+    ],
+    "required_in_closure": [
+      "scripts/60_visual_stress.py",
+      "src/colour/palette.py",
+      "src/data/bricks.py",
+      "src/rendering/ldr.py",
+      "src/training/session.py",
+      "src/vision/metrics.py"
+    ],
+    "source_files": [
+      "src/vision/synthetic.py",
+      "src/vision/detect.py",
+      "src/vision/cv_baseline.py",
+      "src/vision/segment.py",
+      "src/vision/preprocess.py",
+      "src/colour/recognise.py",
+      "src/ui/corrections.py",
+      "src/ui/photo.py",
+      "src/ui/errors.py",
+      "src/eval/visual_stress.py"
+    ]
+  },
+  "superseded": [
+    {
+      "artefacts": "data/reports/60_visual_stress/gen07_{cv,learned}__*.json|md",
+      "cv_manifest_digest": "1fb9213975e9396c9d29fdb530f347c9f27273c215d0cb79e47cdb97b8f962ed",
+      "generation": "gen07",
+      "learned_manifest_digest": "a781871a8bb487a5c9325a0b539a8defe67dbd3c67e2b29025f3f808cd13be6a",
+      "measurements_unchanged": "not claimed. gen08 reran both recognisers end to end and reports what it measured; the rates are what they are.",
+      "not_deleted_because": "it is the record of the attempt that duplicated the declaration instead of extending the record that already existed.",
+      "superseded_because": "nothing in it was found wrong. The declaration it reads was written as a second file, data/reports/60_visual_stress/generation.json, beside this one -- two files stating the same fact, which this project refuses everywhere else and which the presentation tooling would have read differently from the module. Merging the two edited src/eval/visual_stress.py once more, and this run's source_manifest pins it. gen08 is the rerun on the merged tree. From here a generation bump edits this JSON file and nothing else.",
+      "written": "2026-09-05"
+    },
+    {
+      "artefacts": "data/reports/60_visual_stress/gen06_{cv,learned}__*.json|md",
+      "cv_manifest_digest": "43401974c341ab547324e794cc1b55bb19d6188cd98aa23bce95890317038dff",
+      "generation": "gen06",
+      "learned_manifest_digest": "5cbf0c3aac1d0d2c82f70d99bb64a4fe39701dbbc8bce03935876f762fb5f4c0",
+      "measurements_unchanged": "not claimed. gen07 reran both recognisers end to end and reports what it measured; the rates are what they are.",
+      "not_deleted_because": "it is the record of the attempt that fixed the coupling one step short of the end, and of why the declaration had to become data.",
+      "superseded_because": "nothing in it was found wrong, and it was current for under an hour. It was frozen before the last step of the same fix: the generation and the recogniser declaration were still literals in src/eval/visual_stress.py, which its own source_manifest pins, so moving them into data/reports/60_visual_stress/generation.json retired it. gen07 is the rerun on the tree where that move is already made. From gen07 on, a generation bump edits a JSON file that no pack carries and leaves every pinned module byte-identical -- which is the whole point, and which the bump to gen07 itself demonstrates.",
+      "written": "2026-09-05"
+    },
+    {
+      "artefacts": "data/reports/60_visual_stress/gen05_{cv,learned}__*.json|md",
+      "cv_manifest_digest": "8b7d846c0cb500d6d9f3c7f7f1368d00f0635033ac86b22a96dab1c499258f81",
+      "generation": "gen05",
+      "learned_manifest_digest": "188e17a992159636afd78bafff6e42ae5000a730d646ba2f96ab30cd40d822ea",
+      "measurements_unchanged": "not claimed. gen06 reran both recognisers end to end and reports what it measured; the rates are what they are.",
+      "not_deleted_because": "it is the record of what the fifth attempt pinned, and of the coupling that retired it while it was still correct.",
+      "superseded_because": "nothing in it was found wrong. Its source manifest pinned src/ui/full.py, src/ui/app.py, src/ui/model_entry.py and src/demo/showcase.py, because the recogniser it calls -- analyse_photo -- lived in the interface module and raised an error class defined in another one. Correcting the interface's notice text about Phase 3C therefore moved this run's closure and made it unverifiable, for a change to a sentence the run never executes. gen06 is the rerun on the tree where the recogniser has its own module (src/ui/photo.py) and UiError has its own (src/ui/errors.py). The closure now covers the recogniser, whose edits really would move a score, and not the interface's prose -- so the next correction to a notice cannot retire this run.",
+      "written": "2026-09-05"
+    },
+    {
+      "artefacts": "data/reports/60_visual_stress/gen04_{cv,learned}__*.json|md",
+      "cv_manifest_digest": "6ad1074800a9149545fe49743878f3d7082f84e005de68387a8974844b4554bd",
+      "generation": "gen04",
+      "learned_manifest_digest": "3bc325eada4f43c8e2883732ee2da0de14844cd27cb448fed48c64150a61f98f",
+      "measurements_unchanged": "not claimed. gen05 reran both recognisers end to end and reports what it measured; the rates are what they are.",
+      "not_deleted_because": "it is the record of the run that was verified by full model replay, and of the cross-artefact cycle that retired it while it was still correct.",
+      "superseded_because": "nothing in it was found wrong. Its source manifest pins src/training/pack.py, which the Phase 3C generation used to be named inside: bumping Phase 3C edited that file, so this run could no longer be verified against the tree it was produced on. The fix moves the Phase 3C generation out of pack.py into a pointer document, which edits pack.py once more -- and the closure this run pins therefore moves once more. gen05 is that rerun, on the tree where the cycle is already cut, so the next Phase 3C generation cannot move it again.",
+      "written": "2026-08-30"
+    },
+    {
+      "artefacts": "data/reports/60_visual_stress/gen03_{cv,learned}__*.json|md",
+      "cv_manifest_digest": "98c2f39b3edcb9c992dc786af1c48146033be7d43eb3d8ab596d73e9e461d45e",
+      "generation": "gen03",
+      "learned_manifest_digest": "519e7a73a953c46cf76e6ccbbb1dc412f83e4419677b4739435157bb9f5d07ae",
+      "measurements_unchanged": "not claimed. gen04 reran both recognisers end to end and reports what it measured.",
+      "not_deleted_because": "it is the record of what the third attempt pinned, and the reason the fourth one replays the model instead of only re-deriving from its own output.",
+      "superseded_because": "every check it had was internal to its own run directory. The summary re-derived from the rows, the indices re-derived from the rows, the digests covered the rows -- so a result set written by hand and made self-consistent passed all of it, because nothing outside the directory said what the model actually returned for an image. Its per-image record also had no digest of its own, the summary did not name which record it came from, and nothing checked that the accepted list and the scored rows were one to one.",
+      "written": "2026-08-30"
+    },
+    {
+      "artefacts": "data/reports/60_visual_stress/gen02_{cv,learned}__*.json|md",
+      "cv_manifest_digest": "22cef7dd94e5e7e6cabc8c5daa3c326cd5cb48b4090ebcabd7fc222013197423",
+      "generation": "gen02",
+      "learned_manifest_digest": "d77fdfab35f755686dbef40242e64b647c14017bc50e3ea6ac58eef6eea5e2d8",
+      "measurements_unchanged": "not claimed. gen03 reruns both recognisers end to end and reports whatever it measures.",
+      "not_deleted_because": "it is the record of what the second attempt pinned, and the reason the third one exists.",
+      "superseded_because": "its source manifest pinned a hand-written list of nine modules while the import closure of scripts/60_visual_stress.py is 55. src/vision/metrics.py -- the matching arithmetic every false-positive and false-negative count goes through -- was outside it, along with src/ui/app.py, src/rendering/ldr.py, src/colour/palette.py, src/data/bricks.py and src/training/session.py. A change to any of them moved the numbers and not the digest. Separately, run() took its checkpoint and device from the command line without comparing them to the manifest, so a manifest could pin one checkpoint while another produced the answers.",
+      "written": "2026-08-29"
+    },
+    {
+      "artefacts": "data/reports/60_visual_stress/{cv,learned}__*.json|md",
+      "cv_manifest_digest": "040fedb1233abda4ecc9440b2059107e2a4dfd74109f36ecb627dee48c39d6c7",
+      "generation": "gen01",
+      "learned_manifest_digest": "6669ba1ac99682ac1cb42b3694d898c1a3231b1b3aafaa990f037fb1afaef1a7",
+      "measurements_unchanged": "the rates are the same in gen02 -- the scoring logic did not change, only what the manifest records about the model and how the artefacts are compared and written.",
+      "not_deleted_because": "it is the record of what the first attempt pinned, and the reason the second one exists.",
+      "superseded_because": "its learned manifest named a method and no model: no checkpoint path, no weights digest, no selection record, no run summary, no inference device or environment, and the learned path's own four modules were outside the source manifest. Two runs against different weights would have produced manifests that agreed. It also compared results by one sub-field, so the accepted list, the rejected list and the safe-rejection probe could change unnoticed, and it wrote its report and indices with plain writes rather than write-once.",
+      "written": "2026-08-29"
+    }
+  ]
+}

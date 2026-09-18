@@ -93,14 +93,21 @@ class TestDeterminism:
     default is therefore single-worker.
     """
 
+    # Two layers retain multiple equivalent optimal decompositions, but the
+    # smaller slab solves far below the wall limit even when the full suite is
+    # running concurrently.  Reproducibility is asserted only after CP-SAT has
+    # proved every run optimal; comparing timeout-truncated FEASIBLE layouts
+    # would be a scheduler benchmark, not a determinism test.
     SHAPE = "\n".join(
-        f"2x6 ({x},{y},{z})" for z in range(2) for x in (0, 2) for y in (0, 6)
+        f"2x6 (0,{y},{z})" for z in range(2) for y in (0, 6)
     )
 
     def test_repeated_runs_are_identical(self):
         occ = occupancy_of(parse_bricks(self.SHAPE))
-        runs = [retile(occ, seed=0).bricks for _ in range(4)]
-        assert all(r == runs[0] for r in runs)
+        outcomes = [retile(occ, seed=0, time_limit=30.0) for _ in range(4)]
+        assert {outcome.status for outcome in outcomes} == {"OPTIMAL"}
+        runs = [outcome.bricks for outcome in outcomes]
+        assert all(run == runs[0] for run in runs)
 
     def test_default_is_single_worker(self):
         import inspect

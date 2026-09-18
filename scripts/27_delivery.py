@@ -156,7 +156,7 @@ def make_payload(args) -> tuple[dict, dict | None]:
                 "semantic quality"),
             "shape_source": "train-only catalogue",
             "model_loaded": False,
-            "phase_3c": "not authorised and not run",
+            "phase_3c": "evaluated once in gen09; not run here",
         },
         "request": {"caption": args.caption, "inventory": inventory,
                     "top_n": args.top_n,

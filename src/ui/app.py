@@ -107,14 +107,11 @@ NO_MODEL_ZH = (
     "也不執行正式評估。")
 
 
-class UiError(ValueError):
-    """A submitted form the UI refuses, with a message a reader can act on.
-
-    Distinct from :class:`~src.delivery.pipeline.DeliveryError` and
-    :class:`~src.demo.showcase.ShowcaseError` only in where it was raised;
-    all three are rendered the same way, and none of them ever reaches the
-    browser as a traceback.
-    """
+#: Re-exported from :mod:`src.ui.errors`, which holds nothing else. The class
+#: moved there so a module can raise it without importing this one -- see that
+#: module for which archive that coupling was invalidating. Every existing
+#: ``from src.ui.app import UiError`` keeps working.
+from src.ui.errors import UiError  # noqa: F401  (re-export)
 
 
 #: Every exception class the UI treats as "refused, and here is why".  Anything

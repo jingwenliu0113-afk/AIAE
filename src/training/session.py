@@ -144,6 +144,30 @@ def write_once_json(path, obj) -> str:
     return sha256_file(path)
 
 
+def write_once_text(path, text: str) -> str:
+    """The same discipline for a rendered text artefact.
+
+    A published report is a file somebody may already have quoted, so it is
+    written the way every other artefact here is: to a name that must not
+    already exist, atomically, and never over the top of one that does.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent),
+                               prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        _publish(tmp, path)
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+    _fsync_dir(path.parent)
+    return sha256_file(path)
+
+
 def copy_once(src, dst) -> str:
     """The same discipline for a file copy, so a snapshot cannot be rewritten."""
     src, dst = Path(src), Path(dst)

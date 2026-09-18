@@ -134,7 +134,13 @@ def test_the_text_version_names_every_missing_evidence_family(sealed_root):
     assert "structural_success_at_k" in text
     assert "semantic_success_at_k" in text
     assert "full_success_at_k" in text
-    assert "never formally evaluated" in text
+    # Round 74: this used to require "never formally evaluated". gen09
+    # evaluated the gate, so the summary now has to carry that one evaluation
+    # and its direction rather than deny that any exists.
+    assert "never formally evaluated" not in text
+    assert "gen09" in text
+    assert "-5.0pp" in text
+    assert "[-9.4, -0.6]" in text
 
 
 def test_the_command_emits_the_same_read_only_json(cli, sealed_root,

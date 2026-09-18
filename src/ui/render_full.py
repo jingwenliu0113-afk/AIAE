@@ -38,47 +38,171 @@ from src.ui.full import (CAPTURE_ASSUMPTION_ZH, METHOD_LABELS,
                          PHOTO_SINGLE)
 from src.ui.render import CHECK_GLOSS, CSS, ICONS, SOLVER_GLOSS
 
-STEPS = ("庫存與需求", "照片辨識與修正", "結果與交付", "組裝步驟")
+STEPS = ("說想法", "放積木", "看作品")
 
 _EXTRA_CSS = """
-/* --- the detection overlay ------------------------------------------- */
+/* --- the opening block ------------------------------------------------- */
+.intro { display:grid; grid-template-columns:1fr; gap:22px;
+  align-items:center; margin:4px 0 6px; }
+@media (min-width:760px) {
+  .intro { grid-template-columns:minmax(0,1.25fr) minmax(240px,.75fr);
+    gap:28px; }
+}
+/* No ``ch`` cap here: one CJK character is about 1.8ch wide, so the
+   reference's 11ch cut ``今天想蓋什麼？`` in half. The grid column is the
+   bound. */
+.intro .big { font-size:clamp(32px,4.6vw,56px); line-height:1.12;
+  letter-spacing:-.03em; text-wrap:balance; }
+.intro p { max-width:32rem; margin:14px 0 0; color:var(--ink-soft);
+  font-size:16px; line-height:1.55; }
+
+/* Three bricks. Studs on the top edge are the only thing drawn on them:
+   no face, no figure, no expression. */
+.brickscene { position:relative; width:238px; height:164px; margin:8px auto 0; }
+.brickscene span { position:absolute; display:block; height:48px;
+  border:2px solid var(--accent-deep); border-radius:14px;
+  background:var(--accent);
+  box-shadow:inset 0 -10px 0 rgba(18,59,139,.16), 0 8px 0 var(--shadow); }
+.brickscene span::before, .brickscene span::after {
+  content:""; position:absolute; top:-12px; width:34px; height:13px;
+  border:2px solid var(--accent-deep); border-bottom:0;
+  border-radius:9px 9px 2px 2px; background:var(--accent-soft); }
+.brickscene span::before { left:18px; }
+.brickscene span::after { right:18px; }
+.brickscene span:nth-child(1) { top:12px; right:10px; width:124px;
+  transform:rotate(8deg); background:var(--accent-soft); }
+.brickscene span:nth-child(2) { top:67px; left:0; width:162px;
+  transform:rotate(-6deg); }
+.brickscene span:nth-child(3) { right:0; bottom:2px; width:188px;
+  transform:rotate(3deg); background:var(--accent-mid); }
+@media (max-width:760px) {
+  .brickscene { transform:scale(.8); margin-top:-10px; margin-bottom:-12px; }
+}
+
+/* --- the quick-start aside --------------------------------------------- */
+.quick { padding:18px; border-radius:18px; background:var(--paper-2); }
+.quick h3 { font-size:17px; margin:0; }
+.suggest { display:grid; gap:9px; margin-top:12px; }
+.suggest button { min-height:42px; padding:9px 13px; font:inherit;
+  border:1px solid var(--line); border-radius:12px; background:var(--card);
+  color:var(--ink); text-align:left; cursor:pointer;
+  box-shadow:0 3px 0 var(--shadow); }
+.suggest button:hover { border-color:var(--accent-soft); }
+.suggest button:active { transform:translateY(2px); box-shadow:none; }
+
+/* The tray panel is the full interface's own: the two-page UI keeps the
+   plain grid it was designed around. Scoped to ``div`` so the assembly
+   page's ``ol.parts`` list is untouched. */
+div.parts { padding:15px; border:1px solid var(--line); border-radius:18px;
+  background:var(--paper-2); box-shadow:inset 0 3px 0 rgba(47,104,210,.06); }
+
+/* --- the two ways of counting ------------------------------------------ */
+.choice-row { display:grid; grid-template-columns:1fr; gap:14px;
+  margin:22px 0; }
+@media (min-width:760px) { .choice-row { grid-template-columns:1fr 1.35fr; } }
+.choice { display:block; min-height:108px; padding:17px;
+  border:1px solid var(--line); border-radius:16px; background:var(--card);
+  color:var(--ink); text-align:left; text-decoration:none;
+  box-shadow:0 5px 0 var(--shadow); }
+.choice strong { display:block; font-size:17px; font-weight:500; }
+.choice span { display:block; margin-top:6px; color:var(--ink-soft);
+  font-size:15px; line-height:1.45; }
+.choice[aria-current="true"] { background:var(--paper-2);
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(47,104,210,.15), 0 5px 0 var(--shadow); }
+
+/* --- the plus/minus counter, added by script only ---------------------- */
+.counter { display:grid; grid-template-columns:34px 1fr 34px;
+  align-items:center; gap:5px; margin-top:10px; }
+.counter button { width:34px; height:34px; padding:0; font:inherit;
+  font-size:18px; line-height:1; border:1px solid var(--line);
+  border-radius:10px; background:var(--card); color:var(--ink);
+  cursor:pointer; }
+.counter button:hover { border-color:var(--accent-soft); }
+.counter input { margin:0; }
+@media (pointer:coarse) {
+  .counter { grid-template-columns:44px 1fr 44px; }
+  .counter button { width:44px; height:44px; }
+  .suggest button { min-height:44px; }
+}
+
+/* --- everything technical sits behind one of these --------------------- */
+details.adv { margin:20px 0 0; color:var(--ink-soft); }
+details.adv > summary { display:flex; align-items:center; gap:8px;
+  min-height:38px; padding:6px 0; cursor:pointer; font-weight:500;
+  font-size:15px; color:var(--accent-deep); list-style:none; }
+details.adv > summary::-webkit-details-marker { display:none; }
+details.adv > summary::after { content:""; flex:0 0 auto; width:8px;
+  height:8px; margin-top:-3px; border-right:2px solid currentColor;
+  border-bottom:2px solid currentColor; transform:rotate(45deg);
+  transition:transform .16s ease; }
+details.adv[open] > summary::after { transform:rotate(225deg);
+  margin-top:2px; }
+details.adv > .inner { padding:6px 0 4px; }
+details.adv > .inner > :first-child { margin-top:0; }
+details.adv .note:last-child, details.adv .hint:last-child { margin-bottom:0; }
+
+/* --- the result board -------------------------------------------------- */
+.result-grid { display:grid; grid-template-columns:1fr; gap:22px;
+  align-items:center; }
+@media (min-width:760px) {
+  .result-grid { grid-template-columns:1.15fr .85fr; }
+}
+.result-copy h2 { font-size:clamp(24px,3.6vw,31px); }
+.result-copy p { color:var(--ink-soft); line-height:1.55; }
+.ready { display:inline-flex; align-items:center; gap:7px; margin:0 0 12px;
+  font-weight:500; color:var(--accent-deep); }
+.ready svg { width:18px; height:18px; }
+.ready.no { color:var(--warn); }
+.tally { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0 0; }
+.tally span { border:1px solid var(--line); border-radius:13px;
+  background:var(--paper-2); padding:9px 15px; font-size:14px;
+  color:var(--ink-soft); }
+.tally b { display:block; font-weight:500; font-size:22px; color:var(--ink);
+  line-height:1.2; }
+
+/* --- the detection overlay --------------------------------------------- */
 .shot { position:relative; display:inline-block; max-width:100%;
-  border:3px solid var(--line-deep); border-radius:var(--radius-sm);
-  overflow:hidden; background:var(--paper-2); }
+  border:1px solid var(--line); border-radius:18px; overflow:hidden;
+  background:#EEF3FA; }
 .shot img { display:block; max-width:100%; height:auto; }
 .shot svg { position:absolute; inset:0; width:100%; height:100%; }
-.shot svg rect { fill:none; stroke:#1D4ED8; stroke-width:4;
+.shot svg rect { fill:none; stroke:#2F68D2; stroke-width:4;
   vector-effect:non-scaling-stroke; }
 .shot svg rect.low { stroke:#8A4B00; stroke-dasharray:10 6; }
 .shot svg rect.gone { stroke:#B3261E; stroke-dasharray:3 7; }
-.shot svg text { fill:#FFFFFF; font-weight:700; font-size:26px;
-  paint-order:stroke; stroke:#1C222C; stroke-width:6; }
+.shot svg text { fill:#FFFFFF; font-weight:500; font-size:26px;
+  paint-order:stroke; stroke:#17253B; stroke-width:6; }
 
-/* --- the per-item correction table ----------------------------------- */
+/* --- the per-item correction table ------------------------------------- */
 table.edit td, table.edit th { vertical-align:top; }
+table.edit input, table.edit select { min-height:42px; padding:9px 11px; }
 table.edit input[type=number] { max-width:9ch; }
-table.edit input[type=text] { max-width:16ch; }
+table.edit input[type=text] { max-width:17ch; }
 table.edit select { min-width:11ch; }
-.tag { display:inline-block; border:2px solid var(--line-deep);
-  border-radius:999px; padding:1px 9px; font-size:.78rem;
+table.edit label { margin:0; }
+.tag { display:inline-block; border:1px solid var(--line);
+  border-radius:999px; padding:2px 10px; font-size:13px;
   background:var(--paper-2); }
 .tag.model { background:var(--na-bg); }
 .tag.mixed { background:var(--warn-bg); color:var(--warn); }
 .tag.operator { background:var(--ok-bg); color:var(--ok); }
-.was { color:var(--ink-soft); font-size:.8rem; }
+.was { color:var(--ink-soft); font-size:13px; }
 
-/* --- step navigation -------------------------------------------------- */
+/* --- assembly-step navigation ------------------------------------------ */
 .stepbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-  margin:14px 0; }
-.stepbar .count { font-weight:700; }
-ol.parts { columns:2; margin:0; padding-left:1.4em; }
+  margin:18px 0; }
+.stepbar .count { font-weight:500; color:var(--ink-soft); }
+/* ``.parts`` is a grid in the shared sheet; the assembly page's list wants
+   the multi-column flow it always had, so say so explicitly. */
+ol.parts { display:block; columns:2; margin:0; padding-left:1.4em; }
 @media (min-width:720px) { ol.parts { columns:3; } }
-.swatchrow { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
-.swatchrow span { display:inline-flex; align-items:center; gap:6px;
-  border:2px solid var(--line); border-radius:999px; padding:2px 10px;
-  font-size:.82rem; background:var(--paper); }
-.swatchrow i { width:14px; height:14px; border-radius:3px;
-  border:1px solid rgba(28,34,44,.5); display:inline-block; }
+.swatchrow { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.swatchrow span { display:inline-flex; align-items:center; gap:7px;
+  border:1px solid var(--line); border-radius:999px; padding:4px 12px;
+  font-size:14px; background:var(--card); }
+.swatchrow i { width:16px; height:12px; border-radius:3px;
+  border:1px solid var(--accent-deep); display:inline-block; }
 """
 
 _BASE = """<!doctype html>
@@ -87,7 +211,7 @@ _BASE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>{{ title }}｜BrickAgain 完整介面</title>
+<title>{{ title }}｜BrickAgain</title>
 <style>{{ css | safe }}{{ extra_css | safe }}</style>
 </head>
 <body>
@@ -96,8 +220,8 @@ _BASE = """<!doctype html>
   <div class="studs" aria-hidden="true"></div>
   <div class="wrap">
     <div class="brandline">
-      <h1>BrickAgain 完整介面</h1>
-      <span class="tag">本機 · 離線 · 只綁 loopback</span>
+      <h1>BrickAgain</h1>
+      <span class="tag">在你自己的電腦上執行</span>
     </div>
     <ol class="steps">
       {% for name in steps %}
@@ -112,10 +236,17 @@ _BASE = """<!doctype html>
 </main>
 <footer class="foot">
   <div class="wrap">
-    <p>本頁任何數字都不是指標，不可與已封存的 Phase 2 評估比較，
-      也不得改名成 Structural／Semantic／Full Success@K。</p>
-    <p>連通性是相鄰層 footprint 交集，接觸地面是有磚位於 z = 0；
-      兩者都是靜態幾何，不是物理支撐，也不是穩定性分析。</p>
+    <p>照片和結果都放在記憶體裡，關掉就沒了，不會存進專案資料夾。</p>
+    <details class="adv">
+      <summary>技術資訊與限制說明</summary>
+      <div class="inner">
+        <p>本頁任何數字都不是指標，不可與已封存的 Phase 2 評估比較，
+          也不得改名成 Structural／Semantic／Full Success@K。</p>
+        <p>連通性是相鄰層 footprint 交集，接觸地面是有磚位於 z = 0；
+          兩者都是靜態幾何，不是物理支撐，也不是穩定性分析。</p>
+        <p>服務只綁 loopback，並檢查 Host 與 Origin；表單金鑰為每個行程隨機產生。</p>
+      </div>
+    </details>
     <p>本專題與任何積木製造商無關，介面不使用任何第三方商標、標誌或角色。</p>
   </div>
 </footer>
@@ -127,7 +258,7 @@ _START = """{% extends "base.html" %}
 {% block main %}
 {% if error %}
 <div class="note bad" role="alert">
-  <strong>這次沒有執行，原因如下</strong>
+  <strong>這次沒有執行</strong>
   {{ error }}
 </div>
 {% endif %}
@@ -135,78 +266,52 @@ _START = """{% extends "base.html" %}
 <div class="note warn" role="status">{{ notice }}</div>
 {% endif %}
 
-<div class="grid2">
-  <section class="card">
-    <div class="studs" aria-hidden="true"></div>
-    <div class="body">
-      <h2>照片辨識（可選）</h2>
-      <p class="lede">上傳一張照片，先辨識再修正，修正後的庫存會帶進下一步。
-        沒有照片就直接用右邊的手動庫存。</p>
-      <form method="post" action="/photo" enctype="multipart/form-data"
-        accept-charset="utf-8">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label for="photo">照片檔（PNG 或 JPEG，上限 {{ max_upload_mb }} MB）</label>
-        <input type="file" id="photo" name="photo" accept="image/png,image/jpeg"
-          required>
-        <h3>這張照片是</h3>
-        <div class="modes">
-          {% for value in photo_modes %}
-          <label class="mode">
-            <input type="radio" name="photo_mode" value="{{ value }}"
-              {% if loop.first %}checked{% endif %}>
-            <span><strong>{{ photo_mode_labels[value] }}</strong></span>
-          </label>
-          {% endfor %}
-        </div>
-        <h3>辨識方法</h3>
-        <div class="modes">
-          <label class="mode">
-            <input type="radio" name="recognise" value="{{ recognise_cv }}"
-              checked>
-            <span><strong>傳統 CV baseline</strong>
-              <span>輪廓、長寬比與 stud 週期，全部可稽核，不需要權重。</span></span>
-          </label>
-          <label class="mode">
-            <input type="radio" name="recognise" value="{{ recognise_learned }}"
-              {% if not checkpoint_present %}disabled{% endif %}>
-            <span><strong>學習模型（transfer ResNet-18）</strong>
-              <span>{% if checkpoint_present %}使用
-                <span class="mono">{{ checkpoint_display }}</span>。
-              {% else %}沒有可用的 checkpoint，因此停用。{% endif %}</span></span>
-          </label>
-        </div>
-        <p class="hint">{{ capture_assumption }}</p>
-        <p class="hint">{{ recognition_limit }}</p>
-        <div class="actions">
-          <button class="btn" type="submit">辨識這張照片</button>
-        </div>
-      </form>
-    </div>
-  </section>
+<div class="intro">
+  <div>
+    <h2 class="big">今天想蓋什麼？</h2>
+    <p>告訴我你的點子。系統會配合手上的積木，找出適合的作品。</p>
+  </div>
+  <div class="brickscene" role="img"
+    aria-label="三塊藍色積木組成的抽象圖形">
+    <span></span><span></span><span></span>
+  </div>
+</div>
 
-  <section class="card">
-    <div class="studs" aria-hidden="true"></div>
-    <div class="body">
-      <h2>手動庫存與需求</h2>
-      <form method="post" action="/result" accept-charset="utf-8">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        {% if photo_handle %}
-        <input type="hidden" name="photo_handle" value="{{ photo_handle }}">
-        <div class="note ok" role="status">
-          <strong>已帶入修正後的庫存</strong>
-          <span class="mono">{{ form.inventory_spec }}</span>
-        </div>
-        {% endif %}
+<form method="post" action="/result" accept-charset="utf-8">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{% if photo_handle %}
+<input type="hidden" name="photo_handle" value="{{ photo_handle }}">
+{% endif %}
 
-        <label for="caption">中文需求（或英文）</label>
+<section class="card">
+  <div class="studs" aria-hidden="true"></div>
+  <div class="body">
+    <h2>說說你的點子</h2>
+    <div class="grid2">
+      <div>
+        <label for="caption">作品描述</label>
         <textarea id="caption" name="caption" required
           maxlength="{{ max_caption }}"
-          placeholder="例如：我想做一台 30 顆以內的藍色小車，顏色可以替換。"
+          placeholder="例如：我想蓋一座小城堡，要有兩座塔和一個大門。"
           >{{ form.caption }}</textarea>
-        <p class="hint">會抽取類別、最大零件數、偏好顏色、是否允許替代與模式；
-          看得懂但無法套用的條件會**具名回報**，不會靜默猜測。</p>
-
-        <h3>方法</h3>
+        <p class="hint">可以順便寫「最多幾顆」或想要的顏色。
+          看得懂但這次用不上的條件，結果頁會逐條列出，不會靜默忽略。</p>
+      </div>
+      <aside class="quick" aria-label="快速開始" hidden>
+        <h3>快速開始</h3>
+        <div class="suggest">
+          <button type="button"
+            data-example="我想蓋一座小城堡，要有兩座塔和一個大門。">小城堡</button>
+          <button type="button"
+            data-example="我想蓋一台低矮的小火車。">小火車</button>
+          <button type="button"
+            data-example="我想蓋一座可以跨過小河的橋。">一座橋</button>
+        </div>
+      </aside>
+    </div>
+    <details class="adv">
+      <summary>換一種設計方式</summary>
+      <div class="inner">
         <div class="modes">
           {% for value in methods %}
           <label class="mode">
@@ -217,23 +322,51 @@ _START = """{% extends "base.html" %}
           </label>
           {% endfor %}
         </div>
+      </div>
+    </details>
+  </div>
+</section>
 
-        <h3>手動庫存</h3>
-        <div class="parts">
-          {% for part in parts %}
-          <div class="part">
-            <div class="head">
-              <span class="chip" aria-hidden="true"
-                style="background-color:{{ part_colours[part] }}"></span>
-              <label for="qty_{{ part }}">{{ part }}</label>
-            </div>
-            <input type="number" id="qty_{{ part }}" name="qty_{{ part }}"
-              min="0" step="1" inputmode="numeric"
-              value="{{ form.grid.get(part, '') }}">
-          </div>
-          {% endfor %}
+<section class="card">
+  <div class="studs" aria-hidden="true"></div>
+  <div class="body">
+    <h2>把積木放上工作桌</h2>
+    <p class="lede">可以拍照幫忙辨識，也可以直接填寫數量。</p>
+    {% if photo_handle %}
+    <div class="note ok" role="status">
+      <strong>已帶入照片數到的積木</strong>
+      <span class="mono">{{ form.inventory_spec }}</span>
+    </div>
+    {% endif %}
+    <div class="choice-row">
+      <a class="choice" href="#photo-board">
+        <strong>拍照幫我數</strong>
+        <span>適合平放、沒有互相遮住的積木。</span></a>
+      <div class="choice" aria-current="true">
+        <strong>自己填數量</strong>
+        <span>用下方的加減按鈕，快速整理手上的積木。</span></div>
+    </div>
+    <div class="parts">
+      {% for part in parts %}
+      <div class="part">
+        <div class="head">
+          <span class="chip" aria-hidden="true"
+            style="background-color:{{ part_colours[part] }}"></span>
+          <label for="qty_{{ part }}">{{ part }}</label>
         </div>
-        <label for="inventory_spec" style="margin-top:12px">庫存字串（與上面八格擇一）</label>
+        <input type="number" id="qty_{{ part }}" name="qty_{{ part }}"
+          min="0" step="1" inputmode="numeric"
+          value="{{ form.grid.get(part, '') }}">
+      </div>
+      {% endfor %}
+    </div>
+    <p class="hint">1x2 和 2x1 是同一種積木，直的橫的算在一起，不必分開填。
+      目錄裡的作品多半要幾十顆，數量填大一點比較容易找到組得起來的。</p>
+
+    <details class="adv">
+      <summary>其他積木與進階設定</summary>
+      <div class="inner">
+        <label for="inventory_spec">庫存字串（與上面八格擇一）</label>
         <input type="text" id="inventory_spec" name="inventory_spec"
           value="{{ form.inventory_spec }}" maxlength="{{ max_spec }}"
           placeholder="2x4:10,1x2:8">
@@ -253,7 +386,7 @@ _START = """{% extends "base.html" %}
           {% endfor %}
         </div>
         <p class="hint">留白就不配色，結構仍以 LDraw 預設色輸出。
-          某形狀的顏色總量不足時會**具名拒絕**，不會虛構顏色。</p>
+          某形狀的顏色總量不足時會具名拒絕，不會虛構顏色。</p>
 
         <h3>其他</h3>
         <div class="pair">
@@ -293,58 +426,159 @@ _START = """{% extends "base.html" %}
         <fieldset id="decoder"
           {% if form.method != mode_project %}disabled{% endif %}>
           <legend>解碼器控制（只適用於{{ method_labels[mode_project] }}）</legend>
-          <label>
+          <label class="mode" style="border:0;box-shadow:none;padding:0">
             <input type="checkbox" name="placement"
               {% if form.placement %}checked{% endif %}>
-            開啟 placement gate
+            <span>開啟 placement gate</span>
           </label>
           <p class="hint">{{ placement_notice }}</p>
         </fieldset>
-        <p class="hint">不適用的欄位會被**具名拒絕**，不會被靜默忽略。
+        <p class="hint">不適用的欄位會被具名拒絕，不會被靜默忽略。
           頁面上的 JavaScript 只是漸進增強；<strong>伺服器才是權威</strong>，
           關掉 JavaScript 的結果是拒絕，不是靜默接受。</p>
         <noscript>
           <p class="hint">未啟用 JavaScript 時這兩組欄位不會自動停用；
             送出後仍由伺服器判定適用性並具名拒絕。</p>
         </noscript>
-
-        <div class="actions">
-          <button class="btn" type="submit">執行</button>
-          <a class="btn ghost" href="/reset">全部重新開始</a>
+        <div class="note flat">
+          <strong>這個介面不做什麼</strong>
+          <ul>
+            <li>不重新訓練、不調參、不重選 <span class="mono">final_H2</span>。</li>
+            <li>不執行 Phase 3C，不讀取任何已封存的評估案例，不產生 Success@K。</li>
+            <li>不把沒有通過靜態檢查的結構提供下載。</li>
+          </ul>
         </div>
-      </form>
-    </div>
-  </section>
-</div>
+      </div>
+    </details>
 
-<div class="note flat">
-  <strong>這個介面不做什麼</strong>
-  <ul>
-    <li>不重新訓練、不調參、不重選 <span class="mono">final_H2</span>。</li>
-    <li>不執行 Phase 3C，不讀取任何已封存的評估案例，不產生 Success@K。</li>
-    <li>不把沒有通過靜態檢查的結構提供下載。</li>
-  </ul>
-</div>
+    <div class="actions">
+      <a class="btn ghost" href="/reset">全部重新開始</a>
+      <button class="btn" type="submit">開始設計</button>
+    </div>
+  </div>
+</section>
+</form>
+
+<section class="card" id="photo-board">
+  <div class="studs" aria-hidden="true"></div>
+  <div class="body">
+    <h2>拍照幫我數</h2>
+    <p class="lede">這一步可以跳過。把積木平放拍一張，系統先數一遍，
+      你再逐一改成正確的數量。</p>
+    <form method="post" action="/photo" enctype="multipart/form-data"
+      accept-charset="utf-8">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="photo">選一張照片（PNG 或 JPEG，最大 {{ max_upload_mb }} MB）</label>
+      <input type="file" id="photo" name="photo" accept="image/png,image/jpeg"
+        required>
+      <label id="modelabel">這張照片裡有</label>
+      <div class="modes" role="group" aria-labelledby="modelabel">
+        {% for value in photo_modes %}
+        <label class="mode">
+          <input type="radio" name="photo_mode" value="{{ value }}"
+            {% if loop.first %}checked{% endif %}>
+          <span><strong>{{ photo_mode_labels[value] }}</strong></span>
+        </label>
+        {% endfor %}
+      </div>
+      <details class="adv">
+        <summary>辨識方法與已知限制</summary>
+        <div class="inner">
+          <div class="modes">
+            <label class="mode">
+              <input type="radio" name="recognise" value="{{ recognise_cv }}"
+                checked>
+              <span><strong>傳統 CV baseline</strong>
+                <span>輪廓、長寬比與 stud 週期，全部可稽核，不需要權重。</span></span>
+            </label>
+            <label class="mode">
+              <input type="radio" name="recognise"
+                value="{{ recognise_learned }}"
+                {% if not checkpoint_present %}disabled{% endif %}>
+              <span><strong>學習模型（transfer ResNet-18）</strong>
+                <span>{% if checkpoint_present %}使用
+                  <span class="mono">{{ checkpoint_display }}</span>。
+                {% else %}沒有可用的 checkpoint，因此停用。{% endif %}</span></span>
+            </label>
+          </div>
+          <p class="hint">{{ capture_assumption }}</p>
+          <p class="hint">{{ recognition_limit }}</p>
+        </div>
+      </details>
+      <div class="actions">
+        <button class="btn" type="submit">開始辨識</button>
+      </div>
+    </form>
+  </div>
+</section>
 
 <script>
-/* Progressive enhancement only. The server decides which fields apply: with
-   this script absent, an inapplicable field is refused by name rather than
-   silently ignored. */
+/* Progressive enhancement, in three parts.
+
+   The fieldset sync is the load-bearing one: the server decides which fields
+   apply, and with this script absent an inapplicable field is refused by name
+   rather than silently ignored.
+
+   The quick-start panel and the plus/minus buttons are conveniences. Both are
+   *revealed or created* by script, so with JavaScript off nothing dead is on
+   the page: the panel stays hidden and the eight number inputs are exactly
+   what they always were. */
 (function () {
   var cpsat = document.getElementById('cpsat');
   var decoder = document.getElementById('decoder');
   var seedbox = document.getElementById('seedbox');
   var radios = document.querySelectorAll('input[name="method"]');
-  if (!cpsat || !decoder || !seedbox || !radios.length) { return; }
-  function sync() {
-    var picked = null;
-    radios.forEach(function (r) { if (r.checked) { picked = r.value; } });
-    cpsat.disabled = picked !== {{ mode_pipeline | tojson }};
-    decoder.disabled = picked !== {{ mode_project | tojson }};
-    seedbox.disabled = picked === {{ mode_rag | tojson }};
+  if (cpsat && decoder && seedbox && radios.length) {
+    var sync = function () {
+      var picked = null;
+      radios.forEach(function (r) { if (r.checked) { picked = r.value; } });
+      cpsat.disabled = picked !== {{ mode_pipeline | tojson }};
+      decoder.disabled = picked !== {{ mode_project | tojson }};
+      seedbox.disabled = picked === {{ mode_rag | tojson }};
+    };
+    radios.forEach(function (r) { r.addEventListener('change', sync); });
+    sync();
   }
-  radios.forEach(function (r) { r.addEventListener('change', sync); });
-  sync();
+
+  var caption = document.getElementById('caption');
+  var quick = document.querySelector('.quick');
+  if (caption && quick) {
+    quick.hidden = false;
+    quick.querySelectorAll('[data-example]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        caption.value = button.getAttribute('data-example');
+        caption.focus();
+      });
+    });
+  }
+
+  var bump = function (input, delta) {
+    var now = parseInt(input.value, 10);
+    if (isNaN(now) || now < 0) { now = 0; }
+    var next = now + delta;
+    input.value = String(next < 0 ? 0 : next);
+  };
+  document.querySelectorAll('.parts .part').forEach(function (cell) {
+    var input = cell.querySelector('input[type="number"]');
+    var label = cell.querySelector('label');
+    if (!input || !label) { return; }
+    var row = document.createElement('div');
+    row.className = 'counter';
+    var less = document.createElement('button');
+    less.type = 'button';
+    less.textContent = '\\u2212';
+    less.setAttribute('aria-label', '減少 ' + label.textContent + ' 的數量');
+    var more = document.createElement('button');
+    more.type = 'button';
+    more.textContent = '\\uFF0B';
+    more.setAttribute('aria-label', '增加 ' + label.textContent + ' 的數量');
+    input.parentNode.insertBefore(row, input);
+    row.appendChild(less);
+    row.appendChild(input);
+    row.appendChild(more);
+    less.addEventListener('click', function () { bump(input, -1); });
+    more.addEventListener('click', function () { bump(input, 1); });
+  });
 })();
 </script>
 {% endblock %}
@@ -353,22 +587,23 @@ _START = """{% extends "base.html" %}
 _PHOTO = """{% extends "base.html" %}
 {% block main %}
 {% if error %}
-<div class="note bad" role="alert"><strong>這次沒有套用，原因如下</strong>
+<div class="note bad" role="alert"><strong>這次沒有套用</strong>
   {{ error }}</div>
 {% endif %}
 
 <div class="note {{ 'warn' if analysis.unidentified else 'ok' }}" role="status">
   <strong>辨識完成：找到 {{ analysis.found }} 個項目，其中
     {{ analysis.unidentified }} 個沒有被命名</strong>
-  {{ recognition_limit }}
+  數出來的只是建議。下面每一格都可以改，沒認出來的那幾個要你自己決定是什麼；
+  系統不會替你猜一個最接近的。
 </div>
 
 <section class="card">
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
-    <h2>照片與偵測框</h2>
-    <p class="lede">框線畫在照片上方，照片本身沒有被重新編碼。
-      虛線橘框是低信心，虛線紅框是已刪除。</p>
+    <h2>照片裡看到的東西</h2>
+    <p class="lede">框線畫在照片上面，照片本身沒有被改過。
+      橘色虛線代表不太確定，紅色虛線代表已經刪掉。</p>
     <div class="shot">
       <img src="/photo/{{ handle }}/image" width="{{ analysis.width }}"
         height="{{ analysis.height }}"
@@ -386,11 +621,17 @@ _PHOTO = """{% extends "base.html" %}
         {% endfor %}
       </svg>
     </div>
-    <p class="hint">檔名 <span class="mono">{{ filename }}</span>，
-      {{ analysis.width }}×{{ analysis.height }}，
-      模式 {{ photo_mode_labels[analysis.mode] }}，
-      辨識方法 <span class="mono">{{ analysis.method }}</span>。</p>
-    <p class="hint">{{ capture_assumption }}</p>
+    <details class="adv">
+      <summary>這張照片的技術資訊</summary>
+      <div class="inner">
+        <p class="hint">檔名 <span class="mono">{{ filename }}</span>，
+          {{ analysis.width }}×{{ analysis.height }}，
+          模式 {{ photo_mode_labels[analysis.mode] }}，
+          辨識方法 <span class="mono">{{ analysis.method }}</span>。</p>
+        <p class="hint">{{ capture_assumption }}</p>
+        <p class="hint">{{ recognition_limit }}</p>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -400,13 +641,13 @@ _PHOTO = """{% extends "base.html" %}
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
     <h2>人工修正</h2>
-    <p class="lede">模型預測、你的修改與最後採用值分開保存。
-      改了什麼都看得見，原始預測永遠不會被覆寫。</p>
+    <p class="lede">改成正確的就好。你改過的地方會被記下來，
+      系統原本猜的答案也會留著，不會被蓋掉。</p>
     <div class="scroll">
       <table class="edit">
         <caption>共 {{ items | length }} 個項目。</caption>
         <thead><tr>
-          <th>#</th><th>來源</th><th>模型預測</th><th>Top-3</th>
+          <th>#</th><th>來源</th><th>系統猜的</th><th>其他可能</th>
           <th>零件</th><th>數量</th><th>顏色</th><th>框 (x0,y0,x1,y1)</th>
           <th>刪除</th>
         </tr></thead>
@@ -459,7 +700,7 @@ _PHOTO = """{% extends "base.html" %}
       </table>
     </div>
 
-    <h3>新增一個項目</h3>
+    <h3>照片裡漏掉的可以自己補</h3>
     <div class="pair">
       <div>
         <label for="add_part">零件</label>
@@ -481,12 +722,12 @@ _PHOTO = """{% extends "base.html" %}
       {% for name in colours %}<option value="{{ name }}">{{ name }}</option>
       {% endfor %}
     </select>
-    <p class="hint">新增的項目沒有模型預測，會如實記為
+    <p class="hint">自己補的項目沒有系統預測，會如實記成
       <span class="mono">operator</span>。</p>
 
     <div class="actions">
+      <a class="btn ghost" href="/">回上一步</a>
       <button class="btn" type="submit">套用修正</button>
-      <a class="btn ghost" href="/">回到第一步</a>
     </div>
   </div>
 </section>
@@ -496,6 +737,8 @@ _PHOTO = """{% extends "base.html" %}
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
     <h2>修正前／修正後庫存</h2>
+    <p class="lede">修正前共 {{ before_total }} 塊，修正後共 {{ after_total }} 塊。
+      只有「修正後」的數字會被拿去用。</p>
     <div class="scroll">
       <table>
         <caption>只有「採用值」會進入庫存；仍是 unknown 的項目不計入任何零件。</caption>
@@ -510,15 +753,14 @@ _PHOTO = """{% extends "base.html" %}
           <td class="num">{{ row.before }}</td>
           <td class="num">{{ row.after }}</td>
           <td>{% if row.after == row.before %}<span class="g">—</span>
-            {% else %}<span class="pill warn">{{ '%+d' % (row.after - row.before) }}</span>
+            {% else %}<span class="pill na">{{ '%+d' % (row.after - row.before) }}</span>
             {% endif %}</td>
         </tr>
         {% endfor %}
         </tbody>
       </table>
     </div>
-    <p class="hint">修正前共 {{ before_total }} 塊，修正後共 {{ after_total }} 塊；
-      人工改動 {{ corrected.edited_items }} 個項目。
+    <p class="hint">人工改動 {{ corrected.edited_items }} 個項目。
       {% if corrected.unresolved_items %}仍未辨識的項目：
       <span class="mono">{{ corrected.unresolved_items | join(', ') }}</span>
       ——它們不計入庫存。{% endif %}</p>
@@ -540,28 +782,32 @@ _PHOTO = """{% extends "base.html" %}
 <section class="card">
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
-    <h2>用這份庫存繼續</h2>
+    <h2>用這些積木繼續</h2>
     {% if adopted_spec %}
-    <p class="lede">庫存 <span class="mono">{{ adopted_spec }}</span> 會交給既有的
-      <span class="mono">parse_inventory</span>，和手打的庫存走同一條驗證路徑。</p>
-    <label for="caption2">中文需求</label>
+    <p class="lede">要用的積木是 <span class="mono">{{ adopted_spec }}</span>。
+      這份庫存和手打進去的走完全一樣的檢查。</p>
+    <label for="caption2">作品描述</label>
     <textarea id="caption2" name="caption" required maxlength="{{ max_caption }}"
-      placeholder="例如：我想做一台小車。"></textarea>
-    <h3>方法</h3>
-    <div class="modes">
-      {% for value in methods %}
-      <label class="mode">
-        <input type="radio" name="method" value="{{ value }}"
-          {% if loop.first %}checked{% endif %}>
-        <span><strong>{{ method_labels[value] }}</strong></span>
-      </label>
-      {% endfor %}
-    </div>
+      placeholder="例如：我想蓋一台低矮的小火車。"></textarea>
+    <details class="adv">
+      <summary>換一種設計方式</summary>
+      <div class="inner">
+        <div class="modes">
+          {% for value in methods %}
+          <label class="mode">
+            <input type="radio" name="method" value="{{ value }}"
+              {% if loop.first %}checked{% endif %}>
+            <span><strong>{{ method_labels[value] }}</strong></span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </details>
     <div class="actions">
-      <button class="btn" type="submit">執行</button>
+      <button class="btn" type="submit">開始設計</button>
     </div>
     {% else %}
-    <p class="lede">修正後的庫存是空的，因此無法繼續。
+    <p class="lede">修正後一個積木都沒有，所以沒辦法繼續。
       請至少給一個項目指定零件與數量。</p>
     {% endif %}
   </div>
@@ -572,185 +818,113 @@ _PHOTO = """{% extends "base.html" %}
 
 _RESULT = """{% extends "base.html" %}
 {% block main %}
-{% if ready %}
-<div class="note ok" role="status">
-  <strong>找到一件通過靜態交付檢查的結果</strong>
-  下方的預覽、配色、組裝步驟與 LDraw 下載全部出自同一份磚清單。
-  有配色時，圖與檔案也用同一份配色；沒有配色時只有結構相同，顏色不同。
-  這是該件輸出的確定性檢查，<em>不是</em>成功率，也不是任何模型指標。
-</div>
-{% else %}
-<div class="note warn" role="status">
-  <strong>流程正常完成，但本次沒有可交付結果</strong>
-  {{ not_ready_reason }}
-  沒有預覽、沒有配色、沒有組裝步驟，也沒有下載。
-</div>
-{% endif %}
-
 <section class="card">
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
-    <h2>方法與 provenance</h2>
-    <dl class="kv">
-      <dt>方法</dt><dd>{{ method_labels[result.method] }}
-        （<span class="mono">{{ result.method }}</span>）</dd>
-      <dt>執行狀態</dt><dd><span class="mono">{{ result.status }}</span></dd>
-      {% for key, value in provenance_rows %}
-      <dt>{{ key }}</dt><dd class="mono">{{ value }}</dd>
-      {% endfor %}
-      <dt>庫存來源</dt><dd>{{ inventory_origin }}</dd>
-      <dt>手動／採用庫存</dt><dd class="mono">{{ inventory_spec }}</dd>
-    </dl>
-    {% if provenance_notices %}
-    {% for notice in provenance_notices %}
-    <div class="note warn" style="margin-top:12px">{{ notice }}</div>
-    {% endfor %}
-    {% endif %}
-  </div>
-</section>
-
-{% if conditions %}
-<section class="card">
-  <div class="studs" aria-hidden="true"></div>
-  <div class="body">
-    <h2>從中文需求抽取到的條件</h2>
-    <ul>
-      {% for line in conditions.lines %}<li>{{ line }}</li>{% endfor %}
-    </ul>
-    {% if conditions.unresolved %}
-    <div class="note warn">
-      <strong>以下條件被看到但沒有套用，已具名回報</strong>
-      <ul>{% for item in conditions.unresolved %}
-        <li><span class="mono">{{ item.field }}</span>
-          「{{ item.text }}」：{{ item.reason }}</li>{% endfor %}</ul>
-    </div>
-    {% endif %}
-    {% if conditions.not_applied %}
-    <p class="hint">理解了但不影響檢索的條件：
-      {% for item in conditions.not_applied %}
-      <span class="mono">{{ item.field }}</span>（{{ item.reason }}）
-      {% endfor %}</p>
-    {% endif %}
-  </div>
-</section>
-{% endif %}
-
-{% if explanation %}
-<section class="card">
-  <div class="studs" aria-hidden="true"></div>
-  <div class="body">
-    <h2>有根據的推薦說明</h2>
-    <p class="lede">每一句都對應一個可查的數值；沒有語言模型參與。</p>
-    {% for line in explanation.header %}<p>{{ line }}</p>{% endfor %}
-    {% for candidate in explanation.candidates %}
-    <h3>候選 {{ loop.index }}
-      <span class="mono">{{ candidate.evidence.catalog_id }}</span></h3>
-    <ul>{% for line in candidate.sentences %}<li>{{ line }}</li>{% endfor %}</ul>
-    {% endfor %}
-    <div class="note flat"><strong>{{ explanation.selection }}</strong></div>
-    {% if explanation.colour_note %}
-    <p class="hint">{{ explanation.colour_note }}</p>{% endif %}
-    {% for note in explanation.notes %}<p class="hint">{{ note }}</p>{% endfor %}
-  </div>
-</section>
-{% endif %}
-
-{% if attempts %}
-<section class="card">
-  <div class="studs" aria-hidden="true"></div>
-  <div class="body">
-    <h2>F-pipeline 各候選</h2>
-    <p class="lede">依檢索順序嘗試，取第一個通過獨立復驗的結果。
-      逾時與無解是兩種不同狀態。</p>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>#</th><th>catalog_id</th><th>求解狀態</th>
-          <th class="num">秒</th><th>回傳鋪排</th><th>exact cover</th>
-          <th>庫存</th><th>碰撞</th><th>邊界</th><th>接地</th><th>連通</th>
-          <th>可交付</th><th>失敗理由</th></tr></thead>
-        <tbody>
-        {% for row in attempts %}
-        <tr>
-          <td class="num">{{ loop.index }}</td>
-          <td class="mono">{{ row.catalog_id }}</td>
-          <td><span class="mono">{{ row.solver_status }}</span><br>
-            <span class="g">{{ solver_gloss.get(row.solver_status,
-              row.solver_status) }}</span></td>
-          <td class="num">{{ '%.3f' % row.wall_seconds }}</td>
-          {% for key in attempt_flags %}
-          <td>{% if row[key] %}<span class="pill pass">
-              {{ icons['pass'] | safe }} pass</span>
-            {% else %}<span class="pill fail">
-              {{ icons['fail'] | safe }} FAIL</span>{% endif %}</td>
+    <div class="result-grid">
+      {% if finished %}
+      <figure class="preview">
+        <img src="/artifact/{{ handle }}/preview.png"
+          width="{{ finished.preview_width }}"
+          height="{{ finished.preview_height }}"
+          alt="選中結果的 3D 幾何預覽：以 {{ report.result.n_bricks }} 個軸對齊
+            長方體畫出每一塊積木。這是幾何檢視，不是寫實渲染。">
+        <figcaption>形狀示意圖，不是照片，也沒有計算會不會倒。</figcaption>
+      </figure>
+      {% endif %}
+      <div class="result-copy">
+        {% if ready %}
+        <p class="ready">{{ icons['pass'] | safe }}你的積木足夠</p>
+        <h2>{{ report.request.caption }}</h2>
+        <p>需要 {{ report.result.n_bricks }} 顆積木，數量確認足夠，
+          也沒有兩塊積木重疊。</p>
+        <div class="tally">
+          <span>總共<b>{{ report.result.n_bricks }} 顆</b></span>
+          {% if finished and finished.plan %}
+          <span>分成<b>{{ finished.plan.n_steps }} 步</b></span>
+          {% endif %}
+        </div>
+        {% else %}
+        <p class="ready no">{{ icons['fail'] | safe }}這次沒做出來</p>
+        <h2>沒有找到組得起來的作品</h2>
+        <p>{{ why.lead }}</p>
+        {% if why.missing %}
+        <p>最接近的一件要用 {{ why.needed }} 顆積木，你手上還差
+          {{ why.short }} 顆：</p>
+        <div class="swatchrow">
+          {% for part, count in why.missing %}
+          <span><i style="background-color:{{ part_colours[part] }}"></i>
+            <span class="mono">{{ part }}</span> 還差 {{ count }} 顆</span>
           {% endfor %}
-          <td>{{ row.failure or '—' }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-{% endif %}
-
-{% if report %}
-<section class="card">
-  <div class="studs" aria-hidden="true"></div>
-  <div class="body">
-    <h2>選中結果的靜態檢查</h2>
-    <p class="lede">全部由 <span class="mono">{{ report.scored_by }}</span>
-      計算並直接引用；本介面沒有第二份判定邏輯。</p>
-    <div class="checks">
-      {% for row in checks %}
-      <div>
-        <span class="pill {{ row.css }}">{{ icons[row.icon] | safe }}
-          {{ row.label }}</span>
-        <span class="k">{{ row.name }}</span>
-        <span class="g">{{ row.gloss }}</span>
+        </div>
+        {% endif %}
+        <p class="hint">{{ why.advice }}</p>
+        {% endif %}
+        <div class="actions" style="justify-content:flex-start">
+          {% if finished and finished.plan %}
+          <a class="btn" href="/steps/{{ handle }}/1">開始組裝</a>
+          <a class="btn ghost" href="/">換一個</a>
+          {% else %}
+          <a class="btn" href="/">換一個</a>
+          <a class="btn ghost" href="/reset">全部重新開始</a>
+          {% endif %}
+        </div>
+        {% if finished and finished.plan_problem %}
+        <div class="note warn" style="margin-top:18px">
+          <strong>這件作品排不出組裝步驟</strong>
+          有積木被上面的積木吊著，從下往上疊不出來，所以沒有一步一步的教學。
+          原始說明：<span class="mono">{{ finished.plan_problem }}</span>
+        </div>
+        {% endif %}
+        <details class="adv">
+          <summary>下載模型與技術資訊</summary>
+          <div class="inner">
+            {% if finished %}
+            <div class="actions" style="justify-content:flex-start;margin-top:0">
+              <a class="btn ghost" href="/artifact/{{ handle }}/model.ldr"
+                download>下載 LDraw（.ldr）</a>
+            </div>
+            <p class="hint">以實際組裝順序寫入 <span class="mono">0 STEP</span>。
+              檔案只存在本機記憶體與這次連線，不寫入專案的
+              <span class="mono">artifacts/</span>。</p>
+            {% endif %}
+            {% if ready %}
+            <p class="hint">找到一件通過靜態交付檢查的結果。預覽、配色、組裝步驟
+              與 LDraw 下載全部出自同一份磚清單。這是該件輸出的確定性檢查，
+              <em>不是</em>成功率，也不是任何模型指標。</p>
+            {% else %}
+            <p class="hint">流程正常完成，但本次沒有可交付結果：
+              沒有預覽、沒有配色、沒有組裝步驟，也沒有下載。
+              {{ not_ready_reason }}</p>
+            {% endif %}
+            <dl class="kv">
+              <dt>方法</dt><dd>{{ method_labels[result.method] }}
+                （<span class="mono">{{ result.method }}</span>）</dd>
+              <dt>執行狀態</dt><dd><span class="mono">{{ result.status }}</span></dd>
+              {% for key, value in provenance_rows %}
+              <dt>{{ key }}</dt><dd class="mono">{{ value }}</dd>
+              {% endfor %}
+              <dt>庫存來源</dt><dd>{{ inventory_origin }}</dd>
+              <dt>手動／採用庫存</dt><dd class="mono">{{ inventory_spec }}</dd>
+            </dl>
+            <p class="hint">以上是這次執行的方法與 provenance。</p>
+            {% if provenance_notices %}
+            {% for notice in provenance_notices %}
+            <div class="note warn" style="margin-top:14px">{{ notice }}</div>
+            {% endfor %}
+            {% endif %}
+          </div>
+        </details>
       </div>
-      {% endfor %}
     </div>
-    <p class="hint">交付判定用的是不含終止原因的九項：
-      <span class="mono">{{ delivery_checks | join(' ') }}</span>。</p>
-
-    <h3>庫存使用量與剩餘</h3>
-    <div class="scroll">
-      <table>
-        <caption>負數如實印成負數並標記 OVERDRAWN，不會夾到 0。</caption>
-        <thead><tr><th>零件</th><th class="num">備料</th><th class="num">使用</th>
-          <th class="num">剩餘</th><th>狀態</th></tr></thead>
-        <tbody>
-        {% for row in inventory_rows %}
-        <tr>
-          <td><span class="chip" aria-hidden="true"
-            style="background-color:{{ part_colours[row.part] }}"></span>
-            <span class="mono">{{ row.part }}</span></td>
-          <td class="num">{{ row.stocked }}</td>
-          <td class="num">{{ row.used }}</td>
-          <td class="num">{{ row.left }}</td>
-          <td>{% if row.left < 0 %}<span class="pill fail">
-              {{ icons['fail'] | safe }} OVERDRAWN</span>
-            {% else %}<span class="pill pass">
-              {{ icons['pass'] | safe }} 足夠</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <h3>磚清單（{{ report.result.n_bricks }} 塊）</h3>
-    <pre class="text">{{ report.result.text.rstrip() }}</pre>
-    <p class="hint">磚清單印的是實際擺放方向，庫存表印的是正規化後的項目，
-      因此兩張表的拼法可能不同，數量仍然對得上。</p>
   </div>
 </section>
-{% endif %}
 
 {% if finished %}
 <section class="card">
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
-    <h2>配色</h2>
+    <h2>顏色</h2>
     {% if finished.colour_problem %}
     <div class="note bad"><strong>沒有配色</strong>
       {{ finished.colour_problem }}</div>
@@ -773,41 +947,152 @@ _RESULT = """{% extends "base.html" %}
       LDraw、3D 預覽與每一張步驟圖都用<strong>同一份</strong>配色結果，
       顏色值取自同一張調色盤，因此畫面上的顏色就是檔案裡的顏色。</p>
     {% else %}
-    <p class="lede">沒有提供顏色庫存，因此不配色；LDraw 使用預設色，
-      預覽與步驟圖改用「一種形狀一種顏色」的辨識用圖例。
-      三者是同一個結構，但<strong>不是</strong>同一組顏色。</p>
+    <p class="lede">你沒有指定顏色，所以圖上是「一種形狀一種顏色」的辨識用配色。
+      形狀是對的，顏色只是幫你分辨，下載的檔案用的是預設色。</p>
     {% endif %}
   </div>
 </section>
+{% endif %}
 
+{% if conditions %}
 <section class="card">
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
-    <h2>CPU 3D 幾何預覽與交付</h2>
-    <figure class="preview">
-      <img src="/artifact/{{ handle }}/preview.png"
-        width="{{ finished.preview_width }}"
-        height="{{ finished.preview_height }}"
-        alt="選中結果的 3D 幾何預覽：以 {{ report.result.n_bricks }} 個軸對齊
-          長方體畫出每一塊積木。這是幾何檢視，不是寫實渲染。">
-      <figcaption>以 Matplotlib Agg 在 CPU 上繪製。
-        這是幾何檢視，不是寫實渲染，也沒有物理或穩定性分析。</figcaption>
-    </figure>
-    <div class="actions">
-      <a class="btn" href="/artifact/{{ handle }}/model.ldr" download>
-        下載 LDraw（.ldr）</a>
-      {% if finished.plan %}
-      <a class="btn" href="/steps/{{ handle }}/1">看組裝步驟</a>
-      {% endif %}
-      <a class="btn ghost" href="/">換一組需求</a>
-      <a class="btn ghost" href="/reset">全部重新開始</a>
+    <h2>從你寫的那句話讀到什麼</h2>
+    <ul>
+      {% for line in conditions.lines %}<li>{{ line }}</li>{% endfor %}
+    </ul>
+    {% if conditions.unresolved %}
+    <div class="note warn">
+      <strong>以下條件被看到但沒有套用，已具名回報</strong>
+      <ul>{% for item in conditions.unresolved %}
+        <li><span class="mono">{{ item.field }}</span>
+          「{{ item.text }}」：{{ item.reason }}</li>{% endfor %}</ul>
     </div>
-    <p class="hint">LDraw 以實際組裝順序寫入 <span class="mono">0 STEP</span>。
-      檔案只存在本機記憶體與這次連線，不寫入專案的
-      <span class="mono">artifacts/</span>。</p>
-    {% if finished.plan_problem %}
-    <div class="note bad"><strong>沒有組裝步驟</strong>
-      {{ finished.plan_problem }}</div>
+    {% endif %}
+    {% if conditions.not_applied %}
+    <p class="hint">理解了但不影響檢索的條件：
+      {% for item in conditions.not_applied %}
+      <span class="mono">{{ item.field }}</span>（{{ item.reason }}）
+      {% endfor %}</p>
+    {% endif %}
+    {% if explanation %}
+    <details class="adv">
+      <summary>為什麼挑這一件</summary>
+      <div class="inner">
+        <p class="hint">每一句都對應一個可查的數值；沒有語言模型參與。</p>
+        {% for line in explanation.header %}<p class="hint">{{ line }}</p>{% endfor %}
+        {% for candidate in explanation.candidates %}
+        <h3>候選 {{ loop.index }}
+          <span class="mono">{{ candidate.evidence.catalog_id }}</span></h3>
+        <ul>{% for line in candidate.sentences %}<li>{{ line }}</li>{% endfor %}</ul>
+        {% endfor %}
+        <div class="note flat"><strong>{{ explanation.selection }}</strong></div>
+        {% if explanation.colour_note %}
+        <p class="hint">{{ explanation.colour_note }}</p>{% endif %}
+        {% for note in explanation.notes %}<p class="hint">{{ note }}</p>{% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if attempts or report %}
+<section class="card">
+  <div class="studs" aria-hidden="true"></div>
+  <div class="body">
+    <h2>技術資訊</h2>
+    <p class="lede">這一區是研究紀錄用的，看不懂可以略過。</p>
+    {% if attempts %}
+    <details class="adv">
+      <summary>F-pipeline 各候選</summary>
+      <div class="inner">
+        <p class="hint">依檢索順序嘗試，取第一個通過獨立復驗的結果。
+          逾時與無解是兩種不同狀態。</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>#</th><th>catalog_id</th><th>求解狀態</th>
+              <th class="num">秒</th><th>回傳鋪排</th><th>exact cover</th>
+              <th>庫存</th><th>碰撞</th><th>邊界</th><th>接地</th><th>連通</th>
+              <th>可交付</th><th>失敗理由</th></tr></thead>
+            <tbody>
+            {% for row in attempts %}
+            <tr>
+              <td class="num">{{ loop.index }}</td>
+              <td class="mono">{{ row.catalog_id }}</td>
+              <td><span class="mono">{{ row.solver_status }}</span><br>
+                <span class="g">{{ solver_gloss.get(row.solver_status,
+                  row.solver_status) }}</span></td>
+              <td class="num">{{ '%.3f' % row.wall_seconds }}</td>
+              {% for key in attempt_flags %}
+              <td>{% if row[key] %}<span class="pill pass">
+                  {{ icons['pass'] | safe }} pass</span>
+                {% else %}<span class="pill fail">
+                  {{ icons['fail'] | safe }} FAIL</span>{% endif %}</td>
+              {% endfor %}
+              <td>{{ row.failure or '—' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+    {% endif %}
+    {% if report %}
+    <details class="adv">
+      <summary>選中結果的靜態檢查</summary>
+      <div class="inner">
+        <p class="hint">全部由 <span class="mono">{{ report.scored_by }}</span>
+          計算並直接引用；本介面沒有第二份判定邏輯。</p>
+        <div class="checks">
+          {% for row in checks %}
+          <div>
+            <span class="pill {{ row.css }}">{{ icons[row.icon] | safe }}
+              {{ row.label }}</span>
+            <span class="k">{{ row.name }}</span>
+            <span class="g">{{ row.gloss }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="hint">交付判定用的是不含終止原因的九項：
+          <span class="mono">{{ delivery_checks | join(' ') }}</span>。</p>
+      </div>
+    </details>
+    <details class="adv">
+      <summary>庫存使用量與磚清單</summary>
+      <div class="inner">
+        <div class="scroll">
+          <table>
+            <caption>負數如實印成負數並標記 OVERDRAWN，不會夾到 0。</caption>
+            <thead><tr><th>零件</th><th class="num">備料</th>
+              <th class="num">使用</th><th class="num">剩餘</th>
+              <th>狀態</th></tr></thead>
+            <tbody>
+            {% for row in inventory_rows %}
+            <tr>
+              <td><span class="chip" aria-hidden="true"
+                style="background-color:{{ part_colours[row.part] }}"></span>
+                <span class="mono">{{ row.part }}</span></td>
+              <td class="num">{{ row.stocked }}</td>
+              <td class="num">{{ row.used }}</td>
+              <td class="num">{{ row.left }}</td>
+              <td>{% if row.left < 0 %}<span class="pill fail">
+                  {{ icons['fail'] | safe }} OVERDRAWN</span>
+                {% else %}<span class="pill pass">
+                  {{ icons['pass'] | safe }} 足夠</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <h3>磚清單（{{ report.result.n_bricks }} 塊）</h3>
+        <pre class="text">{{ report.result.text.rstrip() }}</pre>
+        <p class="hint">磚清單印的是實際擺放方向，庫存表印的是正規化後的項目，
+          因此兩張表的拼法可能不同，數量仍然對得上。</p>
+      </div>
+    </details>
     {% endif %}
   </div>
 </section>
@@ -821,9 +1106,7 @@ _STEPS = """{% extends "base.html" %}
   <div class="studs" aria-hidden="true"></div>
   <div class="body">
     <h2>組裝步驟 {{ number }} / {{ total }}</h2>
-    <p class="lede">每一步只加入最多 {{ plan.max_per_step }} 顆。
-      每個非地面積木加入時，都與已加入的相鄰下層積木有 footprint 交集；
-      允許先建立多個接地子結構，之後再由橫樑連接。</p>
+    <p class="lede">{{ description }}</p>
     <div class="stepbar">
       {% if number > 1 %}
       <a class="btn ghost" href="/steps/{{ handle }}/{{ number - 1 }}">上一步</a>
@@ -832,12 +1115,12 @@ _STEPS = """{% extends "base.html" %}
       {% if number < total %}
       <a class="btn" href="/steps/{{ handle }}/{{ number + 1 }}">下一步</a>
       {% endif %}
-      <a class="btn ghost" href="/result/{{ handle }}">回到結果</a>
+      <a class="btn ghost" href="/result/{{ handle }}">回到作品</a>
     </div>
     <figure class="preview">
       <img src="/steps/{{ handle }}/{{ number }}/image"
         alt="第 {{ number }} 步的累積結構，共 {{ build.total_bricks }} 塊積木">
-      <figcaption>{{ description }}</figcaption>
+      <figcaption>疊到這一步的樣子，目前共 {{ build.total_bricks }} 塊。</figcaption>
     </figure>
   </div>
 </section>
@@ -852,20 +1135,27 @@ _STEPS = """{% extends "base.html" %}
         <li><span class="mono">{{ part }}</span> ×{{ count }}</li>
         {% endfor %}
       </ul>
-      <h3>這一步之後的狀態</h3>
-      <div class="checks">
-        {% for row in step_checks %}
-        <div>
-          <span class="pill {{ row.css }}">{{ icons[row.icon] | safe }}
-            {{ row.label }}</span>
-          <span class="k">{{ row.name }}</span>
-          <span class="g">{{ row.gloss }}</span>
+      <p class="hint">每一步最多加 {{ plan.max_per_step }} 顆。
+        新加的積木都會壓在已經放好的積木上面；也可以先分開疊幾堆，
+        最後再用長條積木接起來。</p>
+      <p class="hint">目前分成 {{ build.components }} 堆。中間可以有很多堆，
+        只有做完的時候要連成一整件。這裡講的「連起來」只是形狀有沒有疊在一起，
+        <strong>不是物理支撐</strong>，也沒有算會不會倒。</p>
+      <details class="adv">
+        <summary>這一步的靜態檢查</summary>
+        <div class="inner">
+          <div class="checks">
+            {% for row in step_checks %}
+            <div>
+              <span class="pill {{ row.css }}">{{ icons[row.icon] | safe }}
+                {{ row.label }}</span>
+              <span class="k">{{ row.name }}</span>
+              <span class="g">{{ row.gloss }}</span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-        {% endfor %}
-      </div>
-      <p class="hint">目前 {{ build.components }} 個子結構。
-        中間步驟允許有多個；只有最終結構要求單一元件。
-        連通性不是物理支撐，也不是穩定性。</p>
+      </details>
     </div>
   </section>
 
@@ -878,25 +1168,26 @@ _STEPS = """{% extends "base.html" %}
         <li><span class="mono">{{ part }}</span> ×{{ count }}</li>
         {% endfor %}
       </ol>
-      <p class="hint">累積 {{ build.total_bricks }} 塊，
+      <p class="hint">目前用掉 {{ build.total_bricks }} 塊，
         整件作品共 {{ plan.n_bricks }} 塊。</p>
       {% if build.stock_remaining %}
-      <h3>庫存剩餘</h3>
+      <h3>還沒用到的積木</h3>
       <p class="mono">{{ build.stock_remaining | dictsort
         | map('join', ':') | join(', ') }}</p>
       {% endif %}
+      <details class="adv">
+        <summary>全部步驟一覽</summary>
+        <div class="inner">
+          <ol>
+            {% for line in descriptions %}
+            <li{% if loop.index == number %} style="font-weight:500"{% endif %}
+              >{{ line }}</li>
+            {% endfor %}
+          </ol>
+        </div>
+      </details>
     </div>
   </section>
-</div>
-
-<div class="note flat">
-  <strong>全部步驟</strong>
-  <ol>
-    {% for line in descriptions %}
-    <li{% if loop.index == number %} style="font-weight:700"{% endif %}
-      >{{ line }}</li>
-    {% endfor %}
-  </ol>
 </div>
 {% endblock %}
 """
@@ -912,7 +1203,7 @@ _ERROR = """{% extends "base.html" %}
   <div class="body">
     <h2>接下來可以做什麼</h2>
     <p class="lede">{{ advice }}</p>
-    <div class="actions">
+    <div class="actions" style="justify-content:flex-start">
       <a class="btn" href="/">回到第一步</a>
       <a class="btn ghost" href="/reset">全部重新開始</a>
     </div>
@@ -1035,7 +1326,7 @@ def render_start(*, csrf_token: str, form=None, error=None, notice=None,
             "page one may not be rendered without the form key it has to "
             "carry; a form that cannot be submitted is not a page")
     return _ENV.get_template("start.html").render(
-        title="庫存與需求", step=1, form=form or blank_form(), error=error,
+        title="說想法", step=1, form=form or blank_form(), error=error,
         notice=notice, csrf_token=csrf_token, photo_handle=photo_handle,
         checkpoint_present=checkpoint_present,
         checkpoint_display=checkpoint_display,
@@ -1057,7 +1348,7 @@ def render_photo(*, csrf_token: str, handle: str, filename: str, analysis,
         if first or second:
             rows.append({"part": part, "before": first, "after": second})
     return _ENV.get_template("photo.html").render(
-        title="照片辨識與修正", step=2, csrf_token=csrf_token, handle=handle,
+        title="放積木", step=2, csrf_token=csrf_token, handle=handle,
         filename=filename, analysis=analysis.as_dict(), items=items,
         corrected=corrected.as_dict(), inventory_rows=rows,
         before_total=before.total, after_total=corrected.total,
@@ -1082,6 +1373,48 @@ def check_rows(checks: dict) -> list[dict]:
             css, icon, label = "fail", "fail", "FAIL"
         out.append({"name": name, "gloss": gloss, "css": css, "icon": icon,
                     "label": label})
+    return out
+
+
+def why_not_ready(result, explanation) -> dict:
+    """A plain-language reason for a run that delivered nothing.
+
+    Every number here was already computed by the retrieval explanation. This
+    recomputes nothing and judges nothing: it lifts the shortfall out of the
+    collapsed technical block, where a person reading "沒有找到組得起來的作品"
+    could not see the one thing that tells them what to do next -- which parts
+    were short, and by how many.
+    """
+    out = {"lead": "", "missing": [], "needed": 0, "short": 0, "advice": ""}
+    if result.status == "no_semantic_candidate":
+        out["lead"] = "目錄裡沒有找到文字上接近的作品，所以沒有東西可以比對庫存。"
+        out["advice"] = "換一種說法，或把想蓋的東西寫得更具體一點，再試一次。"
+        return out
+
+    best = None
+    for entry in (explanation or {}).get("candidates") or []:
+        evidence = entry.get("evidence") or {}
+        if "missing_total" not in evidence:
+            continue
+        if best is None or evidence["missing_total"] < best["missing_total"]:
+            best = evidence
+
+    if best is None:
+        out["lead"] = "系統試過取回來的候選，但沒有一件能用現在的積木組出來。"
+        out["advice"] = "把積木數量填多一點，或把想法寫得更簡單一點，再試一次。"
+        return out
+
+    if best.get("missing_parts"):
+        out["missing"] = sorted(best["missing_parts"].items())
+        out["needed"] = best.get("required_total") or 0
+        out["short"] = best["missing_total"]
+        out["lead"] = "積木不夠。"
+        out["advice"] = ("把缺的補齊就能組這一件；"
+                         "或在「其他積木與進階設定」裡把候選數量調大，多找幾件。")
+        return out
+
+    out["lead"] = "積木數量是夠的，但取回來的作品沒有通過結構檢查（接地或連通）。"
+    out["advice"] = "換一種說法再試一次，或把候選數量調大，多找幾件。"
     return out
 
 
@@ -1136,7 +1469,8 @@ def render_result(*, result, handle, inventory_spec: str,
             for (part, name), count in sorted(counted.items())]
 
     return _ENV.get_template("result.html").render(
-        title="結果與交付", step=3, result=result, handle=handle,
+        title="看作品", step=3, result=result, handle=handle,
+        why=(why_not_ready(result, explanation) if not result.ready else None),
         ready=result.ready, report=report,
         checks=check_rows(report["checks"]) if report else [],
         delivery_checks=list(load_delivery().DELIVERY_CHECKS),
@@ -1180,7 +1514,7 @@ def render_steps(*, handle: str, plan, number: int, descriptions) -> str:
         rows.append({"name": name, "gloss": gloss, "css": css, "icon": icon,
                      "label": label})
     return _ENV.get_template("steps.html").render(
-        title="組裝步驟", step=4, handle=handle, plan=plan.as_dict(),
+        title="組裝步驟", step=3, handle=handle, plan=plan.as_dict(),
         number=number, total=plan.n_steps, step_checks=rows,
         build=step.as_dict(), descriptions=list(descriptions),
         description=descriptions[number - 1], **_COMMON)

@@ -301,6 +301,8 @@ class TestTheMinimumFPipeline:
         attempt = result.attempts[0]
         assert attempt.solver_status in ("OPTIMAL", "FEASIBLE")
         assert attempt.delivery_ready is True
+        assert attempt.connectivity_enforced is True
+        assert attempt.as_dict()["connectivity_enforced_in_solver"] is True
         assert selected_text(result) == format_bricks(list(attempt.bricks))
 
     def test_infeasibility_is_distinct_from_a_bad_checker_result(self,

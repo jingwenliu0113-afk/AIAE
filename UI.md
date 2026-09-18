@@ -1,9 +1,16 @@
-# BrickAgain 最小兩頁式介面
+# BrickAgain 介面說明
 
-> **這一份描述的是「最小兩頁式」介面，它沒有任何改動。**
+目前的使用者入口是 `scripts/68_bricknet_ui.py`，以 BrickNet 真實零件為核心，
+同時提供庫存推薦與新作品生成。完整操作說明在 `src/bricknet_ext/app/README.md`。
+舊的 `scripts/35_full_ui.py` 已下線；以下「最小兩頁式」內容僅保留歷史研究脈絡，
+不是目前產品的操作方式。新介面的端到端驗收進度以 `PROJECT_STATUS.md` 為準。
+
+## 歷史最小兩頁式介面（舊核心 8 磚）
+
+> **以下描述的是歷史「最小兩頁式」介面。**
 > 其後另行授權的**完整介面**是另一支程式（`scripts/35_full_ui.py`，四頁、
 > 三個入口、照片辨識與人工修正、配色與組裝步驟），文件在
-> [VISION.md](VISION.md) 的「完整介面」一節。兩者並存：完整介面**繼承**這裡的
+> [VISION.md](VISION.md) 的「完整介面」一節。當時兩者並存：完整介面**繼承**這裡的
 > handler，所以底下每一條傳輸層拒絕都是**同一段程式**，不是它的複本。
 > 本檔的 195 項測試仍然是原本的意思。
 
@@ -175,7 +182,8 @@
 **這個介面不做的事：**
 
 - **不生成、不載入權重、不使用 GPU。** 沒有 `--generate`，沒有解碼器入口。
-- **不啟用 Phase 3 placement gate。** 該閘門從未正式評估。
+- **不啟用 Phase 3 placement gate。** 該閘門只被正式評估過一次（Phase 3C `gen09`），
+  且量到的方向是負的：Core Success@4 −5.0pp、95% 區間 [−9.4, −0.6]。
 - **不執行正式評估、不讀取任何已封存的評估案例、不產生 Success@K。**
 - **不複製判定邏輯。** 每一次送出都經由 `scripts/27_delivery.py` 自己的
   `make_payload`，也就是命令列走的那一條；頁面與命令列因此不可能對
@@ -275,7 +283,8 @@ HTTP 介面則以真實 socket 綁在 `127.0.0.1:0` 上，用 `http.client` 驅�
 
 - 它不證明檢索有用。詞彙 baseline 沒有經過任何語意檢索評估。
 - 它不證明 F-pipeline 有效。F-pipeline 已實作但**尚未正式評估**。
-- 它不證明碰撞／連通拒絕層改善了任何成功率。該層從未有過正式指標。
+- 它不證明碰撞／連通拒絕層改善了任何成功率。該層的唯一一次正式指標是
+  Phase 3C `gen09`，而方向是負的：Core Success@4 −5.0pp、95% 區間 [−9.4, −0.6]。
 - 它不改變 `PROJECT_STATUS.md` 裡任何已封存的數字，一個都沒有。
 
 模型研究線維持結束。這一輪新增的是介面，不是研究結果。
@@ -284,3 +293,10 @@ HTTP 介面則以真實 socket 綁在 `127.0.0.1:0` 上，用 `http.client` 驅�
 
 *本專題與任何積木製造商無關，介面不使用任何第三方商標、標誌或角色，
 輸出格式的 LDraw 零件庫本身也不隨附於此。*
+# 2026-09-07 預設更新
+
+BrickNet 入口 `scripts/68_bricknet_ui.py` 預設使用
+`runs/bricknet_retrieval/index_ft` 與 `runs/bricknet_embed_finetune/checkpoint`。
+啟動時核對實際權重與索引身份；不匹配時拒絕啟動。
+`--base` 可明確切回原始模型與 `runs/bricknet_retrieval/index`。
+介面仍是檢索既有作品，不是即時積木生成。

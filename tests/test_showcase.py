@@ -14,6 +14,7 @@ reported as undecided rather than failed.
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -558,10 +559,24 @@ class TestTheReportSaysWhatItIsNot:
         assert inspect_sample("tower")["placement_notice"] is None
         assert PLACEMENT_NOTICE not in format_report(inspect_sample("tower"))
 
-    def test_the_placement_notice_states_it_was_never_evaluated(self):
+    def test_the_placement_notice_states_the_one_evaluation_and_its_direction(
+            self):
+        """gen09 measured this gate once and the direction was against it.
+
+        The notice used to say the gate had "never been formally evaluated"
+        and that "Phase 3C is not authorised". Both were true when written
+        and neither has been true since round 65: gen09 ran 1,920 cells and
+        scored them. A notice that still said "never evaluated" would be the
+        product asserting something the project's own frozen results refute,
+        so this test now pins the replacement -- the one evaluation, its
+        direction, and the fact that it is still not evidence of improvement.
+        """
         low = PLACEMENT_NOTICE.lower()
-        assert "never been formally evaluated" in low
-        assert "not authorised" in low
+        assert "never been formally evaluated" not in low
+        assert "not authorised" not in low
+        assert "gen09" in low
+        assert "-5.0pp" in low
+        assert "[-9.4, -0.6]" in low
         assert "not evidence" in low
 
     def test_the_report_names_the_scorer_it_used(self):
@@ -1142,6 +1157,260 @@ class TestTheCommandLineReachesGenerate:
 # --------------------------------------------------------------------------
 
 
+#: Sentences that asserted the placement gate had no evaluation at all.
+#: Assembled from fragments so this module scanning itself is not a hit, and
+#: given in both languages because the interface is Chinese and the command
+#: line is English -- a scan written only in English let the Chinese ones
+#: survive in ``src/ui/render.py``, ``UI.md`` and ``VISION.md``.
+STALE_GATE_CLAIMS: tuple[str, ...] = (
+    "never been formally " "evaluated",
+    "never formally " "evaluated",
+    "phase 3c is not " "authorised",
+    "not authorised and not " "run",
+    "no metric has ever been " "computed",
+    "從未" "正式評估",
+    "從未經過" "正式評估",
+    "從未有過" "正式指標",
+    # Named, not the bare 未獲授權: that phrase is also how this file records
+    # "this round was not authorised to edit that file", which is a different
+    # subject and must not be swept up.
+    #
+    # One entry, not two. The spaced and unspaced spellings were both listed
+    # at first, which was dead weight: :func:`_has` compares a
+    # whitespace-stripped form as well, so this single entry already matches
+    # Phase 3C未獲授權. The only thing the second entry added was the same hit
+    # reported twice. :func:`test_no_two_stale_claims_normalise_to_the_same`
+    # keeps that from coming back.
+    "phase 3c " "未獲授權",
+)
+
+#: Every surface that says anything about the gate's evaluation status.
+GATE_SURFACES: tuple[str, ...] = (
+    "README.md", "SHOWCASE.md", "UI.md", "DELIVERY.md", "VISION.md",
+    "src/demo/showcase.py", "src/ui/model_entry.py", "src/ui/render.py",
+    "src/ui/full.py", "src/delivery/evidence.py",
+    "scripts/26_showcase.py", "scripts/27_delivery.py",
+    "scripts/35_full_ui.py",
+)
+
+#: A statement about the gate's evaluation has to carry all three. Each entry
+#: is the set of spellings that count, because the documents use typographic
+#: minus and the code uses ASCII.
+GEN09_MARKERS: tuple[tuple[str, ...], ...] = (
+    ("gen09",),
+    ("-5.0pp", "−5.0pp"),
+    ("[-9.4, -0.6]", "[−9.4, −0.6]"),
+)
+
+#: A block is judged when it makes the *affirmative* claim -- "this gate was
+#: evaluated" -- in either language. Deliberately not a broad "mentions the
+#: gate and the word evaluation": a paragraph saying an interface "never
+#: enables the placement gate, reads no frozen evaluation case, and produces
+#: no metric" is describing that interface's scope, not ruling on the gate's
+#: history, and requiring gen09's numbers there would be noise. The negative
+#: claim returning is caught by :data:`STALE_GATE_CLAIMS` instead.
+_EVALUATED_CLAIMS: tuple[str, ...] = (
+    "evaluated once", "evaluated exactly once", "was evaluated",
+    "正式評估過一次", "唯一一次正式指標", "唯一的正式指標",
+    "已於第六十五輪執行完成", "只被正式評估過一次",
+)
+
+
+def _blocks(text: str) -> list[str]:
+    """Paragraphs, as a reader meets them: split on the blank line."""
+    return [" ".join(b.split()) for b in text.split("\n\n") if b.strip()]
+
+
+def _forms(blob: str) -> tuple[str, str]:
+    """Space-joined and space-stripped, both lowered.
+
+    Chinese prose has no spaces, so a line break inside a phrase becomes a
+    space when the block is normalised and the phrase stops matching -- which
+    is how ``DELIVERY.md``'s wrapped 已於第/六十五輪執行完成 first slipped
+    through this check. Matching against both forms costs nothing.
+    """
+    low = blob.lower()
+    return " ".join(low.split()), "".join(low.split())
+
+
+def _has(blob: str, needle: str) -> bool:
+    joined, stripped = _forms(blob)
+    n = needle.lower()
+    return n in joined or "".join(n.split()) in stripped
+
+
+def _missing_markers(blob: str) -> list[tuple[str, ...]]:
+    return [m for m in GEN09_MARKERS if not any(_has(blob, s) for s in m)]
+
+
+def _stale_hits(blob: str) -> list[str]:
+    """Stale claims in ``blob``, matched the way :func:`_has` matches.
+
+    Every stale check goes through this, because the first version of this
+    module wrote the whole-surface scan as a plain ``stale in flat`` while
+    only the marker side used :func:`_has`. The result was a guard that
+    caught 該閘門從未經過正式評估 on one line and missed the identical
+    sentence wrapped across two -- a false negative in the check that was
+    added to stop exactly that class of miss.
+    """
+    return [s for s in STALE_GATE_CLAIMS if _has(blob, s)]
+
+
+class TestTheGateStatementIsCheckedPerPlace:
+    """One check per notice, per paragraph and per emitted string.
+
+    The whole-file version of this rule is not enough and the reason is on
+    record: round 74 corrected ``PORTFOLIO.md`` line 111 while line 484 of the
+    same file already carried the right digest, so a file-wide ``in`` passed
+    over a wrong value for three rounds. The same shape applies here -- a
+    document that states the gen09 result in one paragraph would let a second
+    paragraph go on denying it. So each place is judged on its own text.
+    """
+
+    def test_no_surface_anywhere_still_denies_the_evaluation(self):
+        """Both languages, every surface, reported per file and per phrase."""
+        found: list[str] = []
+        for rel in GATE_SURFACES:
+            path = ROOT / rel
+            assert path.is_file(), rel
+            text = path.read_text(encoding="utf-8")
+            for stale in _stale_hits(text):
+                found.append(f"{rel}: {stale!r}")
+        assert found == [], found
+
+    @pytest.mark.parametrize("blob,why", [
+        ("該閘門從未經過正式評估", "same line"),
+        ("該閘門從未經過\n正式評估", "wrapped across two lines"),
+        ("這個閘門從未經過\n  正式評估，開啟它不是證據",
+         "wrapped and indented, as a docstring would be"),
+        ("Phase 3C 未獲授權，開啟它不能作為改善的證據",
+         "the named authorisation claim"),
+        ("Phase 3C\n未獲授權", "the named claim, wrapped"),
+        ("This has never been formally\nevaluated.", "English, wrapped"),
+    ])
+    def test_the_scan_catches_a_stale_claim_however_it_is_wrapped(
+            self, blob, why):
+        """Line breaks must not hide a stale sentence. Both languages.
+
+        Written because the first version of this scan compared with a plain
+        ``in`` against space-joined text: Chinese prose has no spaces, so a
+        sentence wrapped mid-phrase became 從未經過 正式評估 and stopped
+        matching. The guard passed while the claim was still on the page.
+        """
+        assert _stale_hits(blob), f"not caught ({why}): {blob!r}"
+
+    def test_no_two_stale_claims_normalise_to_the_same(self):
+        """The table's size is the number of rules it actually has.
+
+        :func:`_has` matches a whitespace-stripped form, so two entries that
+        differ only in spacing are one rule wearing two hats: they cannot
+        catch anything the other misses, and a hit gets reported twice. The
+        table briefly held ``phase 3c 未獲授權`` and ``phase 3c未獲授權`` for
+        that reason.
+        """
+        seen: dict[str, list[str]] = {}
+        for claim in STALE_GATE_CLAIMS:
+            seen.setdefault("".join(claim.lower().split()), []).append(claim)
+        duplicates = {k: v for k, v in seen.items() if len(v) > 1}
+        assert duplicates == {}, duplicates
+        assert len(seen) == len(STALE_GATE_CLAIMS)
+
+    def test_the_scan_does_not_sweep_up_the_unrelated_authorisation_phrase(
+            self):
+        """本輪未獲授權更動 is about edit permission, not the gate.
+
+        The stale entry is the named ``Phase 3C 未獲授權`` for this reason:
+        a bare 未獲授權 would fail this file's own records.
+        """
+        assert _stale_hits("`src/generation/brickgpt.py` 本輪未獲授權更動，"
+                           "因此沒有改") == []
+
+    @pytest.mark.parametrize("where", ("src.demo.showcase",
+                                       "src.ui.model_entry"))
+    def test_each_placement_notice_carries_the_result_by_itself(self, where):
+        """The notice a person actually reads, judged on its own words.
+
+        Not the module it lives in: a notice that said only "this gate was
+        evaluated" would pass a file-wide scan because the module docstring
+        above it carries the numbers.
+        """
+        import importlib
+
+        notice = importlib.import_module(where).PLACEMENT_NOTICE
+        assert _stale_hits(notice) == [], (where, _stale_hits(notice))
+        assert _missing_markers(notice) == [], (
+            f"{where}: the notice omits {_missing_markers(notice)}")
+
+    @pytest.mark.parametrize(
+        "rel", [r for r in GATE_SURFACES if r.endswith(".md")])
+    def test_each_paragraph_that_rules_on_the_gate_carries_the_numbers(
+            self, rel):
+        """A paragraph that says the gate was measured says what it measured.
+
+        This is the check that cannot be satisfied from elsewhere in the file:
+        the markers have to be inside the same block as the claim. A document
+        that states gen09's result in one paragraph and asserts a bare "it was
+        evaluated" in another fails here, which is the shape that let a wrong
+        digest live in ``PORTFOLIO.md`` for three rounds.
+        """
+        path = ROOT / rel
+        assert path.is_file(), rel
+        claims, offenders = 0, []
+        for block in _blocks(path.read_text(encoding="utf-8")):
+            if not any(_has(block, c) for c in _EVALUATED_CLAIMS):
+                continue
+            claims += 1
+            missing = _missing_markers(block)
+            if missing:
+                offenders.append((missing, block[:200]))
+        assert offenders == [], offenders
+        if rel.endswith(".md"):
+            assert claims, f"{rel} no longer states the gate was evaluated"
+
+    # The delivery summary's own emitted value is checked where its sealed
+    # fixture lives: tests/test_delivery_evidence.py.
+
+    @pytest.mark.parametrize("rel", ("src/ui/full.py",
+                                     "scripts/27_delivery.py"))
+    def test_the_machine_readable_status_field_names_the_evaluation(self, rel):
+        """``method.phase_3c`` in the emitted payloads.
+
+        A short status field, so it is not required to repeat the interval --
+        the prose surfaces carry that. What it may not do is keep asserting
+        the gate was never authorised and never run, which is what it said
+        until round 74 and is what a consumer of the payload would read.
+        """
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        values = re.findall(r'"phase_3c":\s*"([^"]*)"', text)
+        assert values, f"{rel} no longer emits a phase_3c field"
+        for value in values:
+            assert _stale_hits(value) == [], (rel, value)
+            assert "gen09" in value.lower(), (rel, value)
+
+    def test_the_two_page_interface_says_it_in_the_rendered_html(self):
+        """What a person sees in the browser, rendered for real."""
+        from src.ui.render import render_page_one
+
+        html = render_page_one(csrf_token="t" * 24)
+        low = " ".join(html.split()).lower()
+        assert "placement gate" in low
+        assert _stale_hits(html) == [], _stale_hits(html)
+        assert _missing_markers(html) == [], _missing_markers(html)
+
+    def test_the_command_line_help_says_it_where_the_flag_is_described(
+            self, cli):
+        """``--connectivity`` help text, taken from the parser itself."""
+        parser = cli.build_parser()
+        # The flag that turns the gate on is where the claim belongs.
+        # ``--connectivity`` only selects a mode and makes no claim.
+        texts = [a.help or "" for a in parser._actions
+                 if (a.dest or "") == "placement"]
+        assert texts, "no --placement action found"
+        for text in texts:
+            assert _stale_hits(text) == [], (text, _stale_hits(text))
+            assert _missing_markers(text) == [], (text, _missing_markers(text))
+
+
 class TestItClaimsNothingItCannotShow:
     """The naming rule for the demonstration, enforced rather than promised.
 
@@ -1171,12 +1440,21 @@ class TestItClaimsNothingItCannotShow:
         for rel, text in self.bodies():
             assert "measures nothing" in " ".join(text.split()).lower(), rel
 
-    def test_the_gate_is_stated_as_unevaluated_everywhere_it_appears(self):
+    def test_the_gate_is_stated_as_evaluated_once_and_against(self):
+        """No delivered file in this class's scope still denies gen09.
+
+        The document-wide half of the rule. The per-notice, per-paragraph and
+        per-output halves are in :class:`TestTheGateStatementIsCheckedPerPlace`
+        below, which is where the real work is: a whole-file scan passes as
+        soon as the numbers appear *somewhere*, which is exactly how a stale
+        sentence survived in one paragraph while another paragraph carried
+        the correction.
+        """
         for rel, text in self.bodies():
             flat = " ".join(text.split()).lower()
             if "placement" not in flat:
                 continue
-            assert "never been formally evaluated" in flat, rel
+            assert _stale_hits(text) == [], (rel, _stale_hits(text))
 
     def test_no_delivered_file_calls_the_cpu_path_the_whole_pipeline(self):
         """The CPU path checks and exports a brick list; it does not make one."""

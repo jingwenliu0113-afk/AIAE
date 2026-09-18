@@ -14,10 +14,11 @@ offline and to expose the retrieval/optimisation boundary honestly.
 
 ``compare_existing`` retrieves by caption, then re-ranks the retrieved set by
 the exact inventory calculation.  ``run_f_pipeline`` retrieves the same
-train-only shapes and asks the existing CP-SAT re-tiler to cover each shape
-    within the operator's stock.  Solver success, exact-cover verification,
-    ground contact and adjacent-layer connectivity are separate fields.  Neither
-is support or stability, and neither function makes a physics claim.
+train-only shapes and asks a connectivity-aware CP-SAT re-tiler to cover each
+shape within the operator's stock.  The formulation requires one component;
+the independent checker still verifies exact cover, stock, ground contact and
+adjacent-layer connectivity afterwards.  None is support or stability, and
+neither function makes a physics claim.
 
 Nothing in this module reads the frozen Phase 2 plan, cases, results or
 scores.  Nothing it returns is a metric or evidence that one method improved.
@@ -37,7 +38,8 @@ from pathlib import Path
 from src.data.bricks import (PART_VOCAB, Brick, find_collisions,
                              format_bricks, is_connected, parse_bricks,
                              required_inventory, touches_ground)
-from src.data.retile import occupancy_of, retile
+from src.data.retile import occupancy_of
+from src.delivery.connected_retile import retile_connected as retile
 from src.data.splits import MANIFEST_PATH, SplitManifest
 
 
@@ -134,6 +136,7 @@ class PipelineAttempt:
     in_bounds: bool
     touches_ground: bool
     connected: bool
+    connectivity_enforced: bool
     failure: str | None
     bricks: tuple[Brick, ...] = field(default=(), repr=False)
 
@@ -164,6 +167,7 @@ class PipelineAttempt:
             "in_bounds": self.in_bounds,
             "touches_ground": self.touches_ground,
             "stud_only_connected": self.connected,
+            "connectivity_enforced_in_solver": self.connectivity_enforced,
             "delivery_ready": self.delivery_ready,
             "failure": self.failure,
         }
@@ -463,6 +467,7 @@ def _attempt(comparison: Comparison, inventory: dict[str, int], *,
             solver_returned_tiling=False, exact_cover_verified=False,
             inventory_verified=False, collision_free=False, in_bounds=False,
             touches_ground=False, connected=False,
+            connectivity_enforced=True,
             failure=("solver timeout" if outcome.status == "UNKNOWN" else
                      "no tiling within the supplied inventory"))
 
@@ -495,6 +500,7 @@ def _attempt(comparison: Comparison, inventory: dict[str, int], *,
         solver_returned_tiling=True, exact_cover_verified=exact,
         inventory_verified=stock_ok, collision_free=collision_free,
         in_bounds=in_bounds, touches_ground=grounded, connected=connected,
+        connectivity_enforced=True,
         failure="; ".join(failures) or None, bricks=bricks)
 
 

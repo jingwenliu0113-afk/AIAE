@@ -23,9 +23,11 @@ like it honoured a setting it never saw.
 
 What this is not: a measurement. Nothing it prints is a metric, none of it is
 comparable to the frozen Phase 2 evaluation, and ``--placement`` turning a
-check green is not evidence that anything improved -- that gate has never been
-formally evaluated. The module docstring of :mod:`src.demo.showcase` states
-the limits in full, and every report repeats the short form.
+check green is not evidence that anything improved -- that gate was evaluated
+once, in Phase 3C ``gen09``, and the direction was against it: ``Core
+Success@4`` was -5.0pp, 95% interval [-9.4, -0.6]. The module docstring of
+:mod:`src.demo.showcase` states the limits in full, and every report repeats
+the short form.
 """
 
 from __future__ import annotations
@@ -99,7 +101,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--placement", action="store_true", default=None,
                    help="opt in to the collision/connectivity gate "
-                        "(--generate only; never formally evaluated)")
+                        "(--generate only; evaluated once in Phase 3C "
+                        "gen09: Core Success@4 -5.0pp, 95%% interval "
+                        "[-9.4, -0.6])")
     p.add_argument("--connectivity", choices=CONNECTIVITY_MODES,
                    help="connectivity mode for the placement gate")
     p.add_argument("--model", choices=sorted(MODELS))

@@ -103,6 +103,9 @@ NON_PACKED_SUBTREES: tuple[tuple[str, str], ...] = (
     ("src/eval", "the generation track's acceptance and scoring"),
     ("src/constraints", "the generation track's decoders"),
     ("src/inventory", "the generation track's inventory engine"),
+    ("src/bricknet_ext",
+     "the BrickNet extension: a separate arm over real LDraw parts, with its "
+     "own pack. Nothing about fitting an image classifier reaches it"),
 )
 
 #: Single modules denied by name inside subtrees that do travel.  The rest of

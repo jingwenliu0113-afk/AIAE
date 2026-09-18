@@ -20,8 +20,9 @@ Boundaries, all of which the interface enforces rather than describes:
   memory and never written into the project;
 * ``final_H2`` verified against ``runs/project_model.json`` before any weight
   is read, never retrained, never tuned, never reselected;
-* the placement gate opt-in, off by default, and labelled as never formally
-  evaluated whenever it is on;
+* the placement gate opt-in, off by default, and labelled with the one
+  evaluation it has and that evaluation's direction whenever it is on --
+  Phase 3C gen09, Core Success@4 -5.0pp, 95% interval [-9.4, -0.6];
 * no Phase 3C, no frozen evaluation case, no Success@K, no metric.
 """
 
@@ -64,7 +65,35 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+RETIRED = """這個入口已下線。
+
+BrickAgain 的核心已換成 BrickNet 真實零件軌（14,583 種 LDraw 零件）。
+這支腳本服務的是舊核心（8 種長方磚）的介面，依 CLAUDE.md 第一條，
+舊核心凍結且不再提供使用者入口。
+
+請改用：
+
+    ./.venv/bin/python scripts/68_bricknet_ui.py
+
+舊核心的程式與資料都還在，也仍然可以執行——那是重新驗證已封存證據
+（Phase 2、Phase 3C、final_H2）的唯一途徑。要跑的話直接呼叫
+src.ui.server_full，或用 tests/test_ui_full.py 的 fixture。
+"""
+
+
 def main(argv=None) -> int:
+    """Refuse, by name, and say where the interface went.
+
+    The module and its server are left importable on purpose: the tests still
+    exercise them, and deleting them would remove the only way to re-run the
+    old core's interface against archived evidence. What is removed is the
+    *entry point*, which is what "no user entry" actually means.
+    """
+    print(RETIRED, file=sys.stderr)
+    return EXIT_REFUSED
+
+
+def _main_old(argv=None) -> int:
     args = build_parser().parse_args(argv)
     index = Path(args.index) if args.index else None
     checkpoint = Path(args.checkpoint) if args.checkpoint else None

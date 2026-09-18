@@ -798,8 +798,9 @@ marker 的行為完全沒變，golden vector 仍然釘著它。逐步 PNG／SVG 
 只要有一個 digest 不符，就不會有任何解碼。
 
 **沒有任何路徑可以重訓、調參或重選。** 硬庫存 gate 生效；placement gate
-opt-in、預設關閉，開啟時頁面上會顯示「**這個閘門從未經過正式評估**，
-Phase 3C 未獲授權，開啟它不能作為任何項目改善的證據，反方向也不行」。
+opt-in、預設關閉，開啟時頁面上會顯示「**這個閘門只被正式評估過一次，
+而結果是負的**：Phase 3C `gen09` 量到 Core Success@4 −5.0pp、
+95% 區間 [−9.4, −0.6]，開啟它不能作為任何項目改善的證據」。
 
 **展示 smoke，不是評估。** 一個需求、一份庫存、一次解碼。沒有批次、沒有
 Success@K、沒有 Phase 3C。實測見 `PROJECT_STATUS.md` 的當輪紀錄，那裡也記錄了
@@ -836,9 +837,11 @@ Success@K、沒有 Phase 3C。實測見 `PROJECT_STATUS.md` 的當輪紀錄，�
   不適用於任意一堆 LEGO。
 - **不是使用者自己拍的照片。** 是公開真實照片，這是已知限制。
 - **不證明 RAG 有用。** 沒有事前凍結的 retrieval test。
-- **不證明 placement gate 改善任何事。** 那一層從未有過正式指標。
-- **`stud_only_connected` 不是支撐，也不是穩定性。** 真正的物理穩定性分析需要
-  Gurobi 學術授權，目前沒有。
+- **不證明 placement gate 改善任何事。** 那一層唯一的正式指標是 Phase 3C
+  `gen09`，方向是負的：Core Success@4 −5.0pp、95% 區間 [−9.4, −0.6]。
+- **`stud_only_connected` 不是支撐，也不是穩定性。** 真正的物理穩定性分析
+  本專案未實作。它需要的是一個 LP／MILP solver 與一份力學建模，
+  **不是特定廠商的授權**——已安裝的 `ortools` 即可解（見 `CLAUDE.md`）。
 - **不與 Phase 2 並列。** 這是新任務、新資料、新的凍結 split，
   與已封存的 160 cases 完全無關。
 - **沒有偵測器的比較。** 兩欄共用同一個階段一，框逐個相同；

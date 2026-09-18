@@ -2520,10 +2520,17 @@ def test_exp002_replays_against_its_snapshot_not_the_working_tree():
                           check_working_tree=False) == [], \
         "exp002's own snapshot must still match its manifest"
 
+    # The list is the record of *which* files have drifted and why, not a
+    # tolerance: an unlisted one is still a failure. ``session.py`` joined it
+    # in round 59, which added ``write_once_text`` so a published report gets
+    # the same never-overwrite discipline every other artefact here has.
+    # exp002 does not read that function; its snapshot is unchanged.
+    allowed = {"src/training/lora.py", "src/data/instruction.py",
+               "src/training/session.py"}
     drifted = [rel for rel, meta in manifest["files"].items()
                if hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()
                != meta["sha256"]]
-    assert set(drifted) <= {"src/training/lora.py", "src/data/instruction.py"}, (
+    assert set(drifted) <= allowed, (
         f"unexpected live drift against exp002's manifest: {sorted(drifted)}")
 
 

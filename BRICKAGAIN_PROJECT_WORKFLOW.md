@@ -595,7 +595,7 @@ brickagain/
 - 48 GB Unified Memory 對 1B 級推論、EDA、Embedding、傳統 CV、CP-SAT 與小型本機測試很有利，但仍須以實測 Peak Memory 為準。
 - 不假設 CUDA 專用的 4-bit QLoRA 流程可在 MPS 原樣執行。先比較本機 MPS 的 LoRA、可用量化方案與記憶體／速度；若非量化 LoRA 已可接受，就不必為了使用 QLoRA 搬到 Kaggle。
 - Kaggle／遠端 GPU 是可選備案，不是專題必要條件。只有本機實測不適合時才使用，並保存相同模型、資料、Seed 與設定，避免把 MPS／CUDA 差異誤認為模型差異。
-- OR-Tools CP-SAT、資料處理、檢索與評估優先留在本機；Gurobi 有 macOS arm64 平台，但仍需完成學術授權與安裝驗證。
+- OR-Tools CP-SAT、資料處理、檢索與評估優先留在本機。穩定性分析所需的 LP／MILP 由已安裝的 OR-Tools MPSolver 提供，不另外引入需要授權的求解器。（原文寫「Gurobi 仍需完成學術授權與安裝驗證」，第七十四輪更正。）
 - BrickGPT 渲染依賴若在 macOS 發生問題，先以原始文字與 `.ldr` 成功作為推論煙霧測試通過條件，再處理渲染，不讓 Blender／LDraw 視覺化阻擋核心。
 
 ### 任務
@@ -609,7 +609,7 @@ brickagain/
       （2026-08-13 授權核准；帳號與憑證不進 Git）
 - [x] 安裝 BrickGPT 最小推論環境。（**未裝官方套件**：`bpy` 要求 `numpy<2` 衝突；
       改為自建推論路徑 + 搬移 LDraw 轉換，以官方黃金向量驗證等價）
-- [ ] 先以關閉 Gurobi 的 connectivity fallback 完成一次推論。（目前推論**完全未接**穩定性檢查）
+- [ ] 先以 connectivity fallback 完成一次推論。（目前推論**完全未接**穩定性檢查；物理穩定性不依賴特定求解器，原文寫「關閉 Gurobi 的」，第七十四輪更正）
 - [ ] 保存一組 Prompt、Seed、原始文字、拒絕次數、生成時間、`.ldr` 與渲染結果。
       （已有 prompt/seed/原始文字/時間/`.ldr`；缺拒絕次數與渲染）
 - [x] 記錄本機 CPU／GPU／記憶體與模型載入時間；依實測決定是否完全留在本機。
@@ -875,7 +875,7 @@ flowchart TD
 - 每顆完整候選產生後，可局部建立 stud 連接邊，但不強制每個中間步驟只有一個元件。
 - 允許兩個接觸地面的子結構之後才被橫樑連接；最終輸出才要求符合全域連通規則。
 - 使用 Union-Find 或連接圖維護元件；最終再做全作品連通、支撐與穩定性檢查。
-- 物理穩定性以 BrickGPT Checker 為準；Gurobi 可用時作完整分析，否則保留 connectivity fallback 並標明限制。
+- 物理穩定性以 BrickGPT Checker 為準；力學建模完成後以 OR-Tools MPSolver 作完整分析，在那之前保留 connectivity fallback 並標明限制。（原文寫「Gurobi 可用時」，第七十四輪更正：求解器一直可用，缺的是建模。）
 
 ### 生成策略
 
@@ -2003,7 +2003,8 @@ I_p=0
 - [x] 同層相鄰不算連接、上下層 Footprint 重疊才建立 stud 邊。
 - [x] 多子結構中間狀態與最終全域連通性。（兩柱後接橫樑的案例）
 - [ ] 支撐檢查。**仍未做，也不打算用連通性冒充**：真正的物理穩定性需要
-      Gurobi 學術授權，目前沒有。
+      力學建模＋LP／MILP 求解。**求解器不是障礙**——`ortools` 已安裝。
+      （原文寫「需要 Gurobi 學術授權」，第七十四輪更正。）
 - [x] Tokenizer 單一 token 假設與十槽文法。（Prefix Trie 不需要；Availability Mask 未做）
 - [ ] 已拒絕候選不會被同狀態重複接受。（解碼層，本輪未動）
 - [ ] 單磚重抽上限、上一磚回溯與各種終止原因。（解碼層，本輪未動）

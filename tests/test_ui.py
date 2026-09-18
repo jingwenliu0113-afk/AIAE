@@ -363,8 +363,11 @@ class TestRunningARequest:
                                                                 tmp_path):
         result = run(form(), catalogue_file(tmp_path))
         assert result.payload["method"]["model_loaded"] is False
+        # Round 74: the field used to read "not authorised and not run".
+        # gen09 ran, so the payload states the one evaluation and that this
+        # page did not run it.
         assert result.payload["method"]["phase_3c"] == (
-            "not authorised and not run")
+            "evaluated once in gen09; not run here")
 
         class Liar:
             @staticmethod

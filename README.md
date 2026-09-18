@@ -1,8 +1,18 @@
 # BrickAgain
 
-BrickAgain is a work-in-progress research prototype for generating simplified
-brick structures from text while respecting a finite parts inventory. The core
-track uses the eight rectangular parts represented by StableText2Brick and
+目前的本機產品以 **BrickNet 真實零件**為核心，提供剩餘積木庫存、既有作品推薦、
+新作品生成、互動模型與接點組裝導覽。本機完整流程已實測，功能與限制見
+私人工作樹的 `src/bricknet_ext/app/ACCEPTANCE.md`；以下歷史研究結果不是新產品的成效證明。
+
+本機入口：`./.venv/bin/python scripts/68_bricknet_ui.py`。
+完整操作與依賴說明在私人工作樹的 `src/bricknet_ext/app/README.md`。
+公開研究快照不包含 BrickNet 資料、權重與產品模組，因此不能只下載公開快照就啟動產品。
+
+## Archived research track — eight rectangular parts
+
+The remainder of this README documents the frozen research prototype for
+generating simplified brick structures from text with finite inventory.
+This historical track uses eight rectangular parts from StableText2Brick and
 combines deterministic data preparation, CP-SAT re-tiling, inventory-gated
 decoding, LoRA training utilities, evaluation, and LDraw export.
 
@@ -26,7 +36,8 @@ Implemented and tested:
 - LDraw export aligned with BrickGPT reference vectors.
 - An opt-in collision and connectivity gate for decoding, off by default,
   which makes a colliding placement unreachable rather than detected. It has
-  never been formally evaluated -- see below.
+  been evaluated once, in Phase 3C `gen09`, and the measured direction was
+  against it: `Core Success@4` -5.0pp, 95% interval [-9.4, -0.6] -- see below.
 - A command-line demonstration that checks, exports and draws a brick list on
   the CPU with no model, no GPU and no network. It does not generate on that
   path: the brick list comes from a stored fixture, from you, or from a decode,
@@ -35,17 +46,21 @@ Implemented and tested:
 
 Still open:
 
-- **The collision and connectivity gate has never been formally evaluated.**
-  It is implemented, reviewed and tested, and it is opt-in and off by default.
-  No metric has ever been computed with it enabled, so enabling it is not
-  evidence that any success rate moved, in either direction. The one relevant
-  precedent points the other way: the inventory gate *lowered* the marginal
-  in-bounds and collision-free rates in the four-arm comparison, because
-  constraining one axis moves the others.
+- **The collision and connectivity gate has been evaluated exactly once, and
+  the direction was against it.** Phase 3C `gen09` scored 1,920 cells. Paired
+  over 160 cases, `Core Success@4` was **-5.0pp with a 95% interval of
+  [-9.4, -0.6]**, which excludes zero. Collision-free and in-bounds are 1.0
+  under the gate, but that is construction rather than discovery -- the mask
+  makes those placements unreachable. The cost lands downstream: 614 of 640
+  draws ended in `connectivity_unmet`. The three-arm design **cannot separate
+  the collision mask from the EOS deferral**, so this is the effect of the
+  whole layer and is not attributed to either half. It has been run once,
+  with no independent repeat.
 - Connectivity here means 2-D footprint overlap between adjacent layers. It
-  is not support and not a physics result: nothing in this repository checks
-  centre of mass, moments, or whether a model stands up. That analysis needs
-  a solver this project does not have.
+  describes the archived eight-brick track. The current BrickNet application
+  implements centre-of-mass tipping and quasi-static force/moment balance
+  with OR-Tools GLOP. Missing measured connector capacities remain n/a;
+  physical assembly, insertion paths, impacts and fatigue remain unverified.
 - The MPS slowdown study currently provides a strong short-run signal, not a
   causal result; its first run used a fixed condition order with one run per
   condition.
@@ -63,7 +78,7 @@ progress" would be reading a decision as a backlog.
 That is a statement about the research track, not about delivery. The minimum
 non-UI delivery has completed independent technical review: manual stock can
 drive a train-only existing-work comparison or a
-lexical-retrieval-plus-CP-SAT baseline, and a selected structure can be
+lexical-retrieval-plus-connectivity-aware-CP-SAT baseline, and a selected structure can be
 checked, exported as LDraw, and drawn as a CPU 3-D geometric preview. Static
 delivery requires both ground contact and adjacent-layer connectivity. Ground
 contact is not physics and not stability; connectivity is not support. This is
@@ -113,69 +128,26 @@ The full tested exit-zero compare and F-pipeline commands, including LDraw and
 preview outputs, are in `DELIVERY.md`. This comparison uses a deterministic
 lexical baseline, not a multilingual embedding model. The catalogue rows are
 checked against the frozen object-level split manifest as well as their
-`split=train` labels. The F-pipeline is implemented but has not been formally
-evaluated; neither path produces a metric. Its default train catalogue is
-private processed data and is deliberately absent from the public snapshot.
+`split=train` labels. The F-pipeline's solver now enforces one stud-connected
+component with a flow constraint, and its separate checker verifies that result
+again. It has not been formally evaluated; neither path produces a metric. Its
+default train catalogue is private processed data and is deliberately absent
+from the public snapshot.
 
-## The two-page interface
+## Historical interfaces (old eight-part core)
 
-```bash
-./.venv/bin/python scripts/29_ui.py
-```
-
-A local, CPU-only, offline two-page interface over the same delivery path,
-bound to loopback and nothing else. Page one takes a brief and a manual stock
-of the eight parts and picks one of the two methods; page two shows the method
-actually used, the provenance, the per-candidate evidence, every deterministic
-check, the stock used and left, a CPU 3-D geometric preview, and an LDraw
-download — the last two only when a result actually passes the static delivery
-checks. It is built on the standard library and Jinja2, which are already
-pinned, so it adds no dependency and needs no build step.
-
-It composes the existing delivery path rather than reimplementing it: each
-submission goes through `scripts/27_delivery.py`'s own payload, so the page and
-the command line cannot disagree about what is deliverable. It loads no model,
-offers no decode, never enables the placement gate, reads no frozen evaluation
-case, writes nothing into `artifacts/`, and produces no metric. Operating
-instructions, the failure paths and the full boundary are in [UI.md](UI.md).
-
-The minimum two-page interface was excluded from the earlier minimum delivery
-by explicit decision, and was authorised separately afterwards. It is
-implemented. This public release has completed independent technical review,
-covering the local interface and its delivery boundaries, not model
-effectiveness.
-
-## The full interface
-
-```bash
-./.venv/bin/python scripts/35_full_ui.py
-```
-
-Four pages, still local, still offline, still bound to loopback and nothing
-else: inventory and request, photograph recognition and correction, result and
-delivery, build steps. Three entries — multilingual retrieval over the
-train-only catalogue, the minimum F-pipeline, and one demonstration decode with
-the archived project model.
-
-It adds pages rather than replacing them: the two-page interface above is
-unchanged and still available, and the full one **subclasses** its request
-handler, so every transport refusal is the same code rather than a copy of it.
-What is new is one more accepted content type for a photograph, with its own
-bounded parser; routes for the corrections and the build steps; and a bounded
-in-process store, because a four-page flow has state.
-
-An uploaded photograph is recognised, every detection can be corrected by
-hand, and each item keeps the model's prediction, the operator's edit and the
-adopted value separately, so a corrected inventory can never be mistaken for a
-measured one. Colours are assigned deterministically from a `(part, colour)`
-stock and can never exceed it. The build order re-verifies bounds, collisions,
-stock and the accumulated structure after every step.
-
-The project model is verified against `runs/project_model.json` before any
-weight is read; nothing here retrains, tunes or reselects it. The placement
-gate is opt-in, off by default, and labelled as never formally evaluated
-whenever it is on. There is no Phase 3C, no frozen evaluation case, no
-Success@K and no metric. Full description in [VISION.md](VISION.md).
+The former two-page (`scripts/29_ui.py`) and four-page (`scripts/35_full_ui.py`)
+UIs are archived research implementation over the eight-part core, and their
+boundaries are documented in [UI.md](UI.md). They are not product entry points:
+`scripts/35_full_ui.py` refuses by name and exits non-zero, while
+`scripts/29_ui.py` still runs and is kept only for evidence replay.
+Use `scripts/68_bricknet_ui.py` for the current BrickNet product; see the
+current product guide `src/bricknet_ext/app/README.md` (private product tree) and
+local installation scope `src/bricknet_ext/app/INSTALLATION.md` (private product tree).
+Historical transport and research code stays available for evidence replay.
+Current product dependency notices are in the private product supplement
+`src/bricknet_ext/app/THIRD_PARTY_NOTICES.md`; the root notice remains the
+historical evidence version.
 
 ## Image recognition, retrieval, colour and build steps
 
@@ -362,3 +334,12 @@ issue containing exploit details or credentials.
 Original BrickAgain source code is released under the [MIT License](LICENSE).
 Third-party data, model materials, formats, and adapted code remain governed by
 their own licenses as documented in `THIRD_PARTY_NOTICES.md`.
+
+### Current product dependency limitation
+
+The installed MeshLib 3.1.3.429 license is NON-COMMERCIAL & education / TRIAL
+and permits termination by AMV notice. BrickNet collision and mesh-derived
+mass calculations depend on it. BrickAgain's MIT license does not cover this
+dependency; commercial use or redistribution requires a separate license review
+or a replacement geometry backend and renewed validation. This is an installed
+artifact record, not a grant of third-party rights.

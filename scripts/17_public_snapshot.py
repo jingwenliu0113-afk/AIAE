@@ -63,6 +63,19 @@ PRIVATE_DENY: tuple[tuple[str, str], ...] = (
     ("data/splits/**",
      "frozen split manifest: 28,259 object hashes and 47,389 structure UUIDs"),
 
+    # The Phase 3C archive. The plan carries the test split's captions and
+    # inventories case by case; the membership carries its sample and pair
+    # ids; the audit carries every object id it excluded and why. None of
+    # that is publishable, and denying the whole tree rather than the files
+    # inside it means a fifth file added to a generation is denied on the
+    # day it appears rather than the day somebody remembers.
+    ("data/phase3c/**",
+     "the Phase 3C frozen generations: test-split captions, inventories, "
+     "sample ids, pair ids and object ids"),
+    ("gpu_plans/**",
+     "materialised plans staged for the execution node, which carry the "
+     "same case content"),
+
     ("data/reports/15_mps_order/exp001/**", "per-run session evidence"),
     ("data/reports/15_mps_order/exp002/**", "per-run session evidence"),
     ("data/reports/16_longrun/**", "per-run session evidence"),
@@ -99,6 +112,15 @@ PRIVATE_DENY: tuple[tuple[str, str], ...] = (
      "the private release gate; it verifies this boundary rather than "
      "being part of what the boundary publishes"),
 
+    # Its subject is not published, so inside the snapshot every one of its
+    # checks can only skip -- and a file that is nothing but declared skips
+    # teaches the same lesson the release gate's entry above refuses to
+    # teach. It runs in the private tree, against the document it describes,
+    # which is the only place it can mean anything.
+    ("tests/test_portfolio.py",
+     "it checks PORTFOLIO.md, which is deliberately not published; in the "
+     "snapshot it could only skip"),
+
     # The vision pack's own gate, withheld for the same reason and one more:
     # it builds a real 222 MB pack out of the private image tree, so in a
     # published checkout it can only error. It still travels *in the vision
@@ -107,6 +129,25 @@ PRIVATE_DENY: tuple[tuple[str, str], ...] = (
      "the vision pack's release gate; it builds a real pack from the private "
      "image tree, so a published copy could only error. It travels in the "
      "vision pack itself, where the images are present"),
+
+    # The BrickNet extension is private research. `BRICKNET_EXTENSION.md` section 1
+    # freezes the position: the released datasets ship with no licence text, the
+    # published adapters carry no licence tag on the Hub, and nothing derived from
+    # either is published. Denying the whole extension here is that decision put
+    # where the build enforces it, rather than a promise recorded elsewhere.
+    ("BRICKNET_EXTENSION.md",
+     "the BrickNet extension's frozen contract; the extension is not published"),
+    ("src/bricknet_ext/**",
+     "BrickNet extension source; private research, see BRICKNET_EXTENSION.md section 1"),
+    ("scripts/*_bricknet_*.py", "BrickNet extension scripts; private research"),
+    ("tests/test_bricknet_*.py", "BrickNet extension tests; private research"),
+    ("tests/test_research_record.py",
+     "re-reads RESEARCH_RECORD.md and the private run artifacts it cites -- several of "
+     "which are denied above by name -- so it cannot run in a tree that has neither"),
+    ("data/bricknet/**", "derived from the author's gated dataset; not redistributable"),
+    ("data/reports/bricknet/**", "BrickNet extension reports; private research"),
+    ("artifacts/bricknet/**", "BrickNet generated samples; derived from the gated dataset"),
+    ("BrickNet-master/**", "the author's own source tree; ours to use, not ours to redistribute"),
 )
 
 
@@ -166,6 +207,20 @@ PUBLIC_ALLOW: tuple[str, ...] = (
     "data/reports/16_longrun_design.json",
     "data/reports/16_watchdog_microbenchmark.json",
     "data/reports/15_mps_order/calibration.json",
+
+    # The V1 generation declaration. Not a result: it names which generation is
+    # current, which seven are superseded and why, and which source files the
+    # recogniser closure covers. Checked for what an allowlist is for -- no
+    # absolute path, no credential, no dataset identifier, no per-sample id.
+    #
+    # It is here because round 75 moved this declaration out of
+    # src/eval/visual_stress.py and into a data file, and that module now
+    # refuses to import without it. The public tree does not carry
+    # data/reports/60_visual_stress/**, so tests/test_visual_stress.py stopped
+    # *collecting* there -- one collection error standing in for 88 tests, and
+    # taking four of test_public_snapshot.py's own checks down with it. The
+    # snapshot was publishing a tree whose suite could not run.
+    "data/reports/60_visual_stress/GENERATIONS.json",
 )
 
 
@@ -408,6 +463,14 @@ APPROVED_HITS: dict[str, dict[str, int]] = {
     # one assertion that a home-directory prefix is absent from a written report.
     'tests/test_lora.py': {
         'personal-path|46dc943e3424a225': 1,
+    },
+    # The fixture for "an absolute home path in the package is refused":
+    # the test plants this exact string and requires the privacy scan to
+    # catch it. It has to be here as written -- building it by
+    # concatenation would hide it from this scan as well, which is the
+    # one thing a reviewed approval is better than.
+    'tests/test_teacher_review_v2.py': {
+        'personal-path|0b61db2ffa07b291': 1,
     },
     # the operator warning that tells the node *not* to keep the pack on the
     # Windows filesystem. A bare mount-point prefix in a sentence about

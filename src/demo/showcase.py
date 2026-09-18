@@ -38,16 +38,20 @@ produced it:
     weights, the device, the sampling settings and the gate configuration,
     because a decoded result without them cannot be re-run.
 
-**The placement gate is opt-in, unevaluated, and reachable only by decoding.**
+**The placement gate is opt-in and reachable only by decoding.**
 ``placement`` can only be true on a ``decoded`` report, because the gate is a
 property of a decode that happened -- claiming it over text that arrived some
 other way would be claiming a decode nobody ran. When it is on, the report
-carries the connectivity mode and the gate's own counters. The gate itself has
-**never been formally evaluated**: Phase 3C is not authorised, no metric has
-ever been computed with it on, and turning it on says nothing about Core
-Success@K in either direction. The one relevant precedent points the other way
--- ``InventoryGate`` *lowered* the marginal ``in_bounds`` and ``collision_free``
-rates in Phase 2, because constraining one axis moves the others.
+carries the connectivity mode and the gate's own counters. The gate has been
+**formally evaluated exactly once, in Phase 3C ``gen09``, and the direction
+was against it**: paired over 160 cases, ``Core Success@4`` was **-5.0pp with
+a 95% interval of [-9.4, -0.6]**, which excludes zero. ``collision_free`` and
+``in_bounds`` are 1.0 under the gate, but that is construction rather than
+discovery -- the mask makes those placements unreachable -- and the cost lands
+downstream, with 614 of 640 draws ending in ``connectivity_unmet``. The
+three-arm design cannot separate the collision mask from the EOS deferral, so
+that result belongs to the whole layer. Turning it on here still says nothing
+about Core Success@K: this demonstration measures nothing.
 
 **Connectivity is not support and not physics.** ``stud_only_connected`` is
 2-D footprint overlap between adjacent layers. It does not check centre of
@@ -120,9 +124,11 @@ PLACEMENT_COUNTER_KEYS = ("bricks_placed", "eos_deferrals",
 
 PLACEMENT_NOTICE = (
     "placement gate: ON (opt-in). Collision is masked, so a collision is "
-    "unreachable rather than detected. This has never been formally "
-    "evaluated -- Phase 3C is not authorised -- and it is not evidence that "
-    "anything improved."
+    "unreachable rather than detected. This gate was evaluated once, in "
+    "Phase 3C gen09, and the measured direction was against it: paired over "
+    "160 cases, Core Success@4 was -5.0pp with a 95% interval of "
+    "[-9.4, -0.6], which excludes zero. Turning it on here is not evidence "
+    "that anything improved."
 )
 
 STANDING_NOTICE = (

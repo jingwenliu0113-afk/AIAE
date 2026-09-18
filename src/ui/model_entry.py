@@ -14,9 +14,10 @@ writes a checkpoint, changes a hyper-parameter or chooses between models.  The
 model is whatever the pointer names, at the digests the pointer records.
 
 **The placement gate is opt-in and off by default.**  Turning it on is
-possible and carries a fixed notice: that gate has never been formally
-evaluated, Phase 3C is not authorised, and switching it on is not evidence that
-anything improved -- in either direction.
+possible and carries a fixed notice: that gate was evaluated once, in Phase 3C
+``gen09``, and the direction was against it -- ``Core Success@4`` -5.0pp with
+a 95% interval of [-9.4, -0.6] -- so switching it on here is not evidence that
+anything improved.
 
 **It is a demonstration, not an evaluation.**  One caption, one inventory, one
 decode.  No batch, no Success@K, no frozen case, no metric.
@@ -51,11 +52,12 @@ DEMONSTRATION_NOTICE = (
     "本頁任何數字都不可與已封存的 Phase 2 結果並列。")
 
 PLACEMENT_NOTICE = (
-    "placement gate 已開啟。**這個閘門從未經過正式評估**："
-    "Phase 3C 未獲授權，從未以它計算過任何指標，"
-    "開啟它不能作為任何項目改善的證據，反方向也不行。"
-    "唯一相關的前例指向另一個方向——InventoryGate 曾使 in_bounds 與 "
-    "collision_free 的邊際通過率下降。")
+    "placement gate 已開啟。**這個閘門只被正式評估過一次，而結果是負的**："
+    "Phase 3C gen09 在 160 個配對案例上量到 Core Success@4 為 "
+    "−5.0pp、95% 區間 [−9.4, −0.6]，區間不含 0。"
+    "碰撞與越界在它之下是 100%，但那是遮罩造成的建構而不是發現；"
+    "代價出現在下游——該次 640 個 draw 有 614 個以 connectivity_unmet 結束。"
+    "開啟它不能作為任何項目改善的證據。")
 
 NO_RESULT_NOTICE = (
     "這次解碼沒有產生通過靜態交付檢查的結構，因此沒有預覽也沒有下載。"

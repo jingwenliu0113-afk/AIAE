@@ -218,17 +218,20 @@ still retains the exact caption.
 - **No metric.** Nothing printed is comparable to the frozen evaluation. That
   comparison ran once, on 160 cases frozen in advance, and this demonstration
   does not touch them.
-- **`--placement` is opt-in, unevaluated, and reachable only by decoding.** It
-  can only be true on a decoded report, because the gate is a property of a
-  decode that happened — claiming it over text that arrived some other way
-  would be claiming a decode nobody ran. Its rules and implementation have
-  passed review and its collision masking is exact by construction, and it has
-  **never been formally evaluated**: the evaluation phase for it is not
-  authorised, no metric has ever been computed with it on, and turning it on
-  here says nothing about the success rate in either direction. The one
-  relevant precedent points the other way: the inventory gate *lowered* the
-  marginal `in_bounds` and `collision_free` rates in the frozen evaluation,
-  because constraining one axis moves the others.
+- **`--placement` is opt-in and reachable only by decoding.** It can only be
+  true on a decoded report, because the gate is a property of a decode that
+  happened — claiming it over text that arrived some other way would be
+  claiming a decode nobody ran. Its rules and implementation have passed
+  review and its collision masking is exact by construction. It has been
+  **formally evaluated exactly once, and the direction was against it**:
+  Phase 3C `gen09` scored 1,920 cells, and paired over 160 cases
+  `Core Success@4` was **-5.0pp, 95% interval [-9.4, -0.6]**, excluding zero.
+  `collision_free` and `in_bounds` are 1.0 under the gate, but that is
+  construction rather than discovery; the cost lands downstream, with 614 of
+  640 draws ending in `connectivity_unmet`. The three-arm design cannot
+  separate the collision mask from the EOS deferral, so the result belongs to
+  the whole layer. Turning it on here still says nothing about the success
+  rate: this demonstration measures nothing.
 - **Connectivity is not support and not physics.** `stud_only_connected` is
   2-D footprint overlap between adjacent layers. It does not check centre of
   mass, moments, or whether a model stands up. The separate `unsupported`
