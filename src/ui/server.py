@@ -203,7 +203,14 @@ class UiHandler(BaseHTTPRequestHandler):
                              f'attachment; filename="{filename}"')
         # The one place that knows whether the body was read is the one place
         # that decides whether this connection may carry another request.
-        if self.headers.get("Content-Length") and not self._body_consumed:
+        # A chunked request declares its body in Transfer-Encoding and carries
+        # no Content-Length, so checking that one header left the chunk bytes
+        # in the socket for the next request to be parsed out of -- the exact
+        # poisoning this guard exists to stop. Either header means body bytes
+        # are on the wire.
+        if ((self.headers.get("Content-Length")
+             or self.headers.get("Transfer-Encoding"))
+                and not self._body_consumed):
             self.send_header("Connection", "close")
         self.end_headers()
         if self.command != "HEAD":

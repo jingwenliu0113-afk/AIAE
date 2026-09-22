@@ -28,6 +28,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT_ONLY = "artifact-only:"
 
+# OpenEXR is declared in requirements-vision.txt, not requirements.txt, so a
+# checkout without the vision extras does not have it. These five drive the
+# reader's guards against a real file written by the same library Blender
+# writes with; a stub would test the stub, so they wait for the real one.
+needs_openexr = pytest.mark.skipif(
+    importlib.util.find_spec("OpenEXR") is None,
+    reason="OpenEXR is not installed (requirements-vision.txt)")
+
 from src.vision.pbr import contract as pbr           # noqa: E402
 from src.vision.pbr import project as pbr_project    # noqa: E402
 
@@ -1349,6 +1357,7 @@ def _write_exr(path, rgba, attributes=None):
     return path
 
 
+@needs_openexr
 def test_the_exr_reader_accepts_a_well_formed_file(tmp_path):
     import numpy as np
 
@@ -1362,6 +1371,7 @@ def test_the_exr_reader_accepts_a_well_formed_file(tmp_path):
     assert float(array[0, 0, 0]) == pytest.approx(0.25, abs=1e-3)
 
 
+@needs_openexr
 def test_the_exr_reader_refuses_a_channel_permutation(tmp_path):
     """Alpha is uniformly 1.0 in every render here and R is not, so an
     all-ones fourth plane is a free and exact test of the reorder a
@@ -1383,6 +1393,7 @@ def test_the_exr_reader_refuses_a_channel_permutation(tmp_path):
     assert "not uniformly 1.0" in str(caught.value)
 
 
+@needs_openexr
 def test_the_exr_reader_refuses_a_transparent_film(tmp_path):
     """The other thing a non-uniform alpha means: this track pins
     ``film_transparent`` off, so an alpha below 1 is a scene that was not the
@@ -1397,6 +1408,7 @@ def test_the_exr_reader_refuses_a_transparent_film(tmp_path):
         pbr_colour.read_exr(_write_exr(tmp_path / "alpha.exr", rgba))
 
 
+@needs_openexr
 def test_the_exr_reader_refuses_a_file_that_is_not_scene_linear(tmp_path):
     """The file says what space it is in, and the reader reads that rather
     than assuming it."""
@@ -1413,6 +1425,7 @@ def test_the_exr_reader_refuses_a_file_that_is_not_scene_linear(tmp_path):
     assert "colour space" in str(caught.value)
 
 
+@needs_openexr
 def test_the_exr_reader_accepts_the_space_blender_writes(tmp_path):
     import numpy as np
 
@@ -1472,7 +1485,11 @@ def test_the_array_and_scalar_transfer_functions_agree():
     values = np.linspace(0.0, 1.0, 100001, dtype=np.float64)
     array = pbr_colour.linear_to_srgb(values)
     scalar = np.array([pbr.linear_to_srgb_scalar(float(v)) for v in values])
-    assert float(np.abs(array - scalar).max()) == 0.0
+    # Bit-exact on arm64. x86-64 contracts the multiply-add differently and
+    # lands one ULP away near 1.0, so one ULP is the strongest claim that is
+    # true on both -- and it still fails for a curve that is actually
+    # different, which is what this test is for.
+    assert float(np.abs(array - scalar).max()) <= np.finfo(np.float64).eps
 
 
 # ---------------------------------------------------------------------------

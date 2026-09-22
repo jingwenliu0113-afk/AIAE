@@ -1603,11 +1603,22 @@ class TestThePreviewDrawsTheAssignedColours:
             brick_facecolours([Brick(1, 1, 0, 0, 0)], colours=[4])
 
 
+# ubuntu-latest ships no CJK font, and these three assert what happens when
+# one is present: the resolver reaches past the base family and the heading
+# survives untouched. The absent case is not lost -- the two tests below force
+# it with a stub coverage function and assert the documented degradation.
+needs_cjk_font = pytest.mark.skipif(
+    resolve_font("組裝步驟")["cjk_family"] is None,
+    reason="no CJK font on this machine")
+
+
 class TestThePreviewDrawsCharactersOrSaysItCannot:
+    @needs_cjk_font
     def test_the_base_family_alone_cannot_draw_chinese(self):
         """The premise of the fix, asserted rather than assumed."""
         assert resolve_font("組裝步驟")["families"][0] != BASE_FONT
 
+    @needs_cjk_font
     def test_a_chinese_heading_resolves_to_a_family_that_covers_it(self):
         font = resolve_font("第 1 步：組裝預覽")
         assert font["undrawable"] == ()
@@ -1619,6 +1630,7 @@ class TestThePreviewDrawsCharactersOrSaysItCannot:
         assert font["families"] == (BASE_FONT,)
         assert font["cjk_family"] is None
 
+    @needs_cjk_font
     def test_a_drawable_heading_is_returned_unchanged_with_no_note(self):
         caption = safe_heading("第 1 步：組裝預覽")
         assert caption["heading"] == "第 1 步：組裝預覽"

@@ -425,6 +425,13 @@ def test_session_status_reports_pending_runs(tmp_path):
     init(tmp_path)
     st = lr.session_status("exp016a", root=tmp_path / "reports")
     assert st["completed"] == [] and st["next_run"] == "b1"
+    if st["this_boot"] is None:
+        # boot_identity reads kern.bootsessionuuid / kern.boottime, which only
+        # the Mac has; it documents None as "the caller must refuse" and the
+        # injected-sysctl tests in test_mps_order.py cover every branch of it,
+        # including this one. One-run-per-boot is a Mac-side rule, so there is
+        # nothing here for another platform to assert.
+        pytest.skip("no readable boot identity on this platform")
     assert st["this_boot"] and st["boot_already_used"] is False
 
 

@@ -1297,6 +1297,10 @@ class TestARefusalDoesNotPoisonTheConnection:
         stream = client.raw(blob)
         assert b"411" in stream.split(b"\r\n")[0]
         assert self._responses(stream) == 1
+        # Its four siblings assert this and it did not, which is why it was
+        # the one that stayed green on a machine whose socket happened to be
+        # torn down before the leftover chunks were parsed.
+        assert b"Connection: close" in stream
 
 
 class TestEveryNumberIsBoundedAndAscii:

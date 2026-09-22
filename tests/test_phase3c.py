@@ -2410,8 +2410,17 @@ def test_the_documents_do_not_claim_the_grant_is_staged():
                    for p in included)
 
 
-def test_the_materialiser_refuses_without_the_flag(capsys):
+def test_the_materialiser_refuses_without_the_flag(capsys, monkeypatch):
+    """The flag guard, which only speaks once the Mac guard has let it.
+
+    Off the Mac the Mac guard refuses first, with its own message and the same
+    exit code -- so on Linux this passed its assertion on 2 for the wrong
+    reason and failed on the text. The platform is pinned to the one the stage
+    is allowed to run on; ``test_scoring_refuses_off_the_mac`` covers the
+    other side.
+    """
     cli = _cli()
+    monkeypatch.setattr(cli.platform, "system", lambda: "Darwin")
     assert cli.main(["--materialize", "--out-dir", "/dev/null"]) == 2
     assert "open-test-after-codex-approval" in capsys.readouterr().err
 
@@ -2422,8 +2431,10 @@ def test_scoring_refuses_off_the_mac():
     assert cli._mac_guard("score", system="Darwin") == []
 
 
-def test_verify_refuses_without_a_carried_digest(capsys):
+def test_verify_refuses_without_a_carried_digest(capsys, monkeypatch):
+    """The digest guard, past the Mac guard -- see the materialiser above."""
     cli = _cli()
+    monkeypatch.setattr(cli.platform, "system", lambda: "Darwin")
     assert cli.main(["--verify", "--out-dir", "/tmp"]) == 2
     assert "carried-seal-digest" in capsys.readouterr().err
 

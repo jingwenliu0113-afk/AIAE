@@ -35,9 +35,32 @@ SOURCE = {
 }
 
 
+# Which of several equally-optimal tilings CP-SAT returns is fixed for a given
+# seed on a given build, and differs between builds. Seed 0 tiles the two
+# identical layers differently on macOS/arm64, so they bridge; on Linux/x86-64
+# it tiles them the same and the generator correctly refuses the result with
+# "control disconnected". Every property below is a property of a generated
+# pair, not of a seed, so the module takes the first seed this machine's solver
+# connects -- and says which seeds it tried when none of them do.
+def _generated(limit: int = 8):
+    refusals = []
+    for seed in range(limit):
+        try:
+            return seed, make_pair(SOURCE, "train", seed=seed)
+        except GenerationError as exc:
+            refusals.append(f"seed {seed}: {exc}")
+    pytest.skip(
+        f"no seed below {limit} tiles the 5x7x2 block into a connected pair on "
+        f"this solver build: {'; '.join(refusals)}",
+        allow_module_level=True)
+
+
+SEED, _PAIR = _generated()
+
+
 @pytest.fixture(scope="module")
 def pair():
-    return make_pair(SOURCE, "train", seed=0)
+    return _PAIR
 
 
 class TestPairing:
@@ -252,8 +275,8 @@ class TestProvenance:
 
 class TestDeterminism:
     def test_same_seed_same_dropped_part(self):
-        a = make_pair(SOURCE, "train", seed=0)
-        b = make_pair(SOURCE, "train", seed=0)
+        a = make_pair(SOURCE, "train", seed=SEED)
+        b = make_pair(SOURCE, "train", seed=SEED)
         assert [s.dropped_part for s in a] == [s.dropped_part for s in b]
         assert [s.bricks_txt for s in a] == [s.bricks_txt for s in b]
 
@@ -324,7 +347,7 @@ class TestSplitLeakage:
         m = build(self.ROWS)
         oid = m.ids("train")[0]
         row = dict(SOURCE, object_id=oid)
-        derived = make_pair(row, m.split_of_object(oid), seed=0)
+        derived = make_pair(row, m.split_of_object(oid), seed=SEED)
         assert all(s.split == "train" for s in derived)
 
 
