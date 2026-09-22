@@ -1,0 +1,29 @@
+# Vision classifier training.
+#
+# These values were compiled into `TrainConfig` and `Augmentation` in
+# src/vision/model.py as dataclass defaults. They live here so a run can be
+# changed without editing code, and so the training manifest records which
+# file a run came from rather than which commit.
+#
+# The dataclass defaults stay where they are: this file overrides them, and a
+# key that is absent here keeps its default. A key that is *not* a field is an
+# error rather than a value that quietly does nothing -- see
+# `src/config.py` and `tests/test_config.py`.
+
+train:
+  epochs: 8
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  seed: 0
+  freeze_backbone: true
+  trainable_stages: 1
+  label_smoothing: 0.05
+
+augmentation:
+  horizontal_flip: true
+  vertical_flip: true
+  quarter_turns: true
+  brightness: 0.18
+  contrast: 0.14
+  enabled: true

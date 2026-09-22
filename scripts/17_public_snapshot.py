@@ -170,6 +170,22 @@ PUBLIC_ALLOW: tuple[str, ...] = (
     "SECURITY.md",
     "CONTRIBUTING.md",
     "THIRD_PARTY_NOTICES.md",
+    "MODEL_CARD.md",
+    "Makefile",
+    "pyproject.toml",
+    ".github/workflows/ci.yml",
+
+    # Hyperparameters, read by src/config.py rather than compiled in.
+    "configs/*.yaml",
+
+    # EDA over the committed reports, not over the corpus, so it runs in a
+    # published checkout that has no dataset.
+    "notebooks/*.ipynb",
+
+    # Regenerated from data/reports/*.json by scripts/73_figures.py, and the
+    # CI job fails if a report moved and the figure did not.
+    "reports/figures/*.png",
+
     "BRICKAGAIN_PROJECT_WORKFLOW.md",
     "SHOWCASE.md",
     "DELIVERY.md",

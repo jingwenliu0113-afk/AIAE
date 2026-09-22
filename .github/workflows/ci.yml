@@ -1,0 +1,73 @@
+name: CI
+
+# A green check is only worth something if a red one would have told you
+# something. Both jobs below fail on things that are actually wrong rather
+# than on formatting: see the `[tool.ruff.lint]` note in pyproject.toml for
+# why the rule set is narrow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    # Runs on the version pyproject.toml declares as the floor, so the
+    # `requires-python = ">=3.11"` claim is checked rather than assumed. This
+    # is how a 3.12-only f-string escape was found on a 3.13 machine.
+    name: lint (python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff==0.16.8
+      - name: ruff
+        run: ruff check src scripts tests
+
+  test:
+    name: test (python 3.13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # The handbook this repository is delivered against asks for a smoke
+      # run on a 1% sample before the full suite. No dataset ships here, so
+      # the equivalent is the subset that needs none: configuration loading,
+      # the split assignment, the leakage properties and CP-SAT re-tiling.
+      # It fails in seconds when something structural is broken, instead of
+      # forty minutes later.
+      - name: Smoke
+        run: >-
+          python -m pytest
+          tests/test_config.py tests/test_no_leakage.py tests/test_retile.py
+          -q
+
+      - name: Suite
+        run: python -m pytest tests/ -q
+
+      # Figures are generated from the JSON reports in data/reports/ and are
+      # committed. If a report changes and nobody regenerates, the figures in
+      # the README describe an older run -- so the build says so.
+      - name: Figures are current
+        run: |
+          python scripts/73_figures.py
+          git diff --exit-code -- reports/figures \
+            || { echo "::error::reports/figures/ is stale; run 'make figures'"; exit 1; }

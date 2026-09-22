@@ -22,7 +22,12 @@ wrong:
 * **Every image goes through one decoder.**
   :func:`src.vision.preprocess.decode_image` enforces format, byte size and
   header-declared pixel count, so a decompression bomb is refused before its
-  pixels exist.
+  pixels exist.  The pixel ceiling is a parameter rather than a constant here,
+  because it is the one bound whose right value depends on the caller: the
+  eight-part interface takes photographs of a mat, and the BrickNet interface
+  takes whatever a current phone produces, which is routinely past this
+  module's default.  The default is unchanged, so passing nothing is what it
+  always was.
 
 Nothing here writes to disk.  The uploaded bytes live in memory for the
 duration of one request and in the bounded in-process store the result page
@@ -187,7 +192,8 @@ def safe_filename(raw: str | None) -> str:
 
 def parse_multipart(body: bytes, content_type: str, *,
                     image_fields=(), text_fields=(),
-                    max_bytes: int = MAX_UPLOAD_BYTES) -> Multipart:
+                    max_bytes: int = MAX_UPLOAD_BYTES,
+                    max_pixels: int | None = None) -> Multipart:
     """Parse a body into text fields and decoded images, or refuse.
 
     ``image_fields`` and ``text_fields`` are the names this endpoint expects.
@@ -237,7 +243,8 @@ def parse_multipart(body: bytes, content_type: str, *,
             if name not in allowed_images:
                 raise UploadError(
                     f"欄位 {name!r} 送來一個檔案，但這個表單不接受該欄位的檔案")
-            images.append(_decode_part(name, filename, headers, payload))
+            images.append(_decode_part(name, filename, headers, payload,
+                                       max_pixels=max_pixels))
             continue
         if name not in allowed_text:
             raise UploadError(
@@ -253,14 +260,25 @@ def parse_multipart(body: bytes, content_type: str, *,
 
 
 def _decode_part(name: str, filename: str | None, headers: dict[str, str],
-                 payload: bytes) -> UploadedImage:
-    """Decode one file part through the project's single image entry point."""
-    from src.vision.preprocess import ImageError, decode_image
+                 payload: bytes, *,
+                 max_pixels: int | None = None) -> UploadedImage:
+    """Decode one file part through the project's single image entry point.
+
+    Only ``max_pixels`` is a parameter. The byte cap stays this module's own
+    ``MAX_UPLOAD_BYTES``: threading the body cap through here as well would
+    have raised one image's limit by the 64 KiB of form fields a multipart
+    body is allowed on top of it -- a small change, but one nobody asked for
+    and one the existing caller would have inherited silently.
+    """
+    from src.vision.preprocess import (MAX_IMAGE_PIXELS, ImageError,
+                                       decode_image)
 
     if not payload:
         raise UploadError(f"欄位 {name} 的檔案是空的；請選擇一張照片")
     try:
-        loaded = decode_image(payload, max_bytes=MAX_UPLOAD_BYTES)
+        loaded = decode_image(
+            payload, max_bytes=MAX_UPLOAD_BYTES,
+            max_pixels=MAX_IMAGE_PIXELS if max_pixels is None else max_pixels)
     except ImageError as exc:
         # The decoder's message already names the rule that was broken --
         # format, byte size or declared pixel count -- so it is passed through

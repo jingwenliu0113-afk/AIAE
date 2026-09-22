@@ -22,6 +22,25 @@ decoding, LoRA training utilities, evaluation, and LDraw export.
 BrickAgain is an independent research project and is not affiliated with or
 endorsed by the LEGO Group, the BrickGPT authors, Meta, or LDraw.org.
 
+## What the corpus looks like, and what it forced
+
+Four figures, each regenerated from a JSON report in `data/reports/` by
+`scripts/73_figures.py` (`make figures`). The build fails if a report changes
+and the figure is not regenerated, so a chart here cannot be older than the
+number behind it.
+
+| | |
+|---|---|
+| ![Placements by inventory item](reports/figures/01_part_distribution.png) | **Fourteen raw spellings, eight inventory items.** The corpus writes `1x2` and `2x1` for the same brick. Folding them is not cosmetic: not folding halves every count and doubles the vocabulary, and nothing downstream complains. `1x2` then carries 24.1% of 5.10M placements and `1x6` carries 5.0%. |
+| ![Variant breakdown](reports/figures/02_variant_breakdown.png) | **Why the counterfactual set had to be generated.** 18,790 objects have more than one recorded build, but 11,944 of those variants use an identical inventory. Only 1,251 — 6.7% — use different part types, which is what an inventory-constrained model needs to learn from. The rest are re-tiled by `src/data/retile.py`. |
+| ![CP-SAT feasibility](reports/figures/03_retile_feasibility.png) | **Feasibility is not uniform.** Restricted to seven of the eight parts, CP-SAT re-tiles every structure it is given. Restricted to `1x1`, it succeeds 8.8% of the time. The 88.0% overall figure is an average across a distribution this lopsided, and quoting it alone would be misleading. |
+| ![Stagger ablation](reports/figures/04_stagger_ablation.png) | **An ablation that said no.** Requiring staggered courses cost 140x the solve time and *reduced* stud connectivity from 38.3% to 20.8%. The pipeline does not stagger. Recorded because a rejected option is evidence, and because the next person to have the idea should not have to spend the 985 seconds. |
+
+`notebooks/01_eda.ipynb` walks the same reports interactively; it reads the
+committed JSON, not the corpus, so it runs in a fresh checkout.
+
+Limitations, biases and intended use are in [`MODEL_CARD.md`](MODEL_CARD.md).
+
 ## Current status
 
 Implemented and tested:

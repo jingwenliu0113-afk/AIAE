@@ -31,7 +31,12 @@ PACK_EVIDENCE = PHASE3C_DIR / "pack_manifest.json"
 EXECUTION_GRANT = PHASE3C_DIR / "execution_authorization.json"
 SOURCE_ARCHIVE = PHASE3C_DIR / "source_snapshot_v2.zip"
 SOURCE_BINDING = PHASE3C_DIR / "source_binding_v2.json"
-LIVE_DRIFT = PHASE3C_DIR / "live_drift_v2.json"
+# v2 described the tree as it stood when the allowlist last changed. The
+# receipt is write-once by design -- `_write_once_json` refuses to replace a
+# different one -- so a later change to a declared drifting file gets a new
+# receipt rather than an edit to the old one. v2 stays on disk: it recorded
+# what was true then, and nothing about it became wrong.
+LIVE_DRIFT = PHASE3C_DIR / "live_drift_v3.json"
 POSTSCORE_SEAL = Path("data/reports/bricknet/42_postscore_seal_v1.json")
 
 PARENT_SEAL = Path("artifacts/bricknet/evidence_v5/outputs/seal.json")

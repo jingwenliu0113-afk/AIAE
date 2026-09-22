@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brickagain-local"
+version = "0.1.0"
+description = "Local BrickAgain development source; external data and models required"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+include = ["src", "src.*"]
+
+[tool.setuptools.package-data]
+"src.bricknet_ext.app" = ["*.json", "assets/*.js", "assets/vendor/three/LICENSE", "assets/vendor/three/build/*.js", "assets/vendor/three/examples/jsm/**/*.js"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+# `requires-python` above says 3.11, and this makes that claim checkable:
+# ruff parses every file against 3.11 rather than the interpreter running it.
+# It is how the 3.12-only f-string escape in src/bricknet_ext/app/ui.py was
+# found, on a machine where 3.13 accepted it silently.
+
+[tool.ruff.lint]
+# Deliberately narrow, and worth saying why rather than leaving a reader to
+# assume the code is clean under the defaults. It is not: the full rule set
+# reports ~1,700 findings, almost all stylistic, and ~700 of them are
+# auto-fixable in files whose bytes are pinned by the frozen Phase 3C
+# execution closure (see scripts/71_evidence_chain.py). Reformatting those
+# would trade a lint badge for the ability to re-verify archived runs.
+#
+# So the gate is the subset that catches defects rather than taste: syntax
+# errors, undefined names, and comparisons that cannot mean what they say.
+# This set passes today, which is what makes a red build informative.
+select = ["E9", "F63", "F7", "F82"]
