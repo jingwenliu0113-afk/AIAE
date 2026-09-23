@@ -270,7 +270,9 @@ class TestProvenance:
             assert s.split == "train"
 
     def test_records_seed_and_solver_status(self, pair):
-        assert all(s.seed == 0 and s.solver_status for s in pair)
+        # The seed the fixture actually used -- which is 0 on this machine and
+        # need not be on another solver build; see _generated() above.
+        assert all(s.seed == SEED and s.solver_status for s in pair)
 
 
 class TestDeterminism:
