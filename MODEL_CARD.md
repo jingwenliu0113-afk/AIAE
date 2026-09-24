@@ -115,8 +115,13 @@ not reshuffle between runs or between machines.
 - Seeds are fixed; hyperparameters live in `configs/vision.yaml` and are read
   by `src/config.py`, with `tests/test_config.py` proving the file is actually
   read rather than shadowed by the compiled-in defaults.
-- `scripts/73_figures.py` writes figures deterministically: an unchanged
-  rebuild produces identical bytes.
+- `scripts/73_figures.py` writes figures deterministically, but the bytes
+  are only reproducible on the platform that drew them: on ubuntu-latest an
+  unchanged rebuild came out different in all four PNGs, with matplotlib
+  pinned. So CI does not redraw. It checks `reports/figures/figures.json` --
+  the SHA-256 of the generator, of every report each figure read, and of each
+  PNG -- which gives the same answer on any machine and still fails when a
+  report moves without a redraw.
 - Dataset and model artefacts are **not** in this repository. Several
   experiments in `data/reports/` therefore cannot be re-executed from a
   public checkout; their recorded results and digests are what travels.

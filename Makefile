@@ -12,7 +12,7 @@ PYTEST  ?= $(PY) -m pytest
 DATA    ?= data/processed
 
 .DEFAULT_GOAL := help
-.PHONY: help setup lint test smoke figures eda features data train eval serve clean
+.PHONY: help setup lint test smoke figures figures-check eda features data train eval serve clean
 
 help:  ## List the targets
 	@grep -hE '^[a-z][a-zA-Z0-9_-]*:.*?## ' $(MAKEFILE_LIST) \
@@ -35,6 +35,9 @@ smoke:  ## The fast subset: config, splits, leakage, re-tiling
 
 figures:  ## Regenerate reports/figures/ from data/reports/
 	$(PY) scripts/73_figures.py
+
+figures-check:  ## Are the committed figures current? Draws nothing
+	$(PY) scripts/73_figures.py --check
 
 eda:  ## Corpus statistics — needs the dataset
 	@$(MAKE) --no-print-directory _needs-data WHAT="exploratory analysis"
@@ -67,7 +70,7 @@ serve:  ## Serve the interface on loopback
 
 clean:  ## Remove caches and generated figures
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
-	rm -rf .pytest_cache reports/figures/*.png
+	rm -rf .pytest_cache reports/figures/*.png reports/figures/figures.json
 
 _needs-data:
 	@test -d "$(DATA)" || { \

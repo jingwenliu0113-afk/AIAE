@@ -1,0 +1,38 @@
+{
+  "drawn_with": {
+    "matplotlib": "3.11.1",
+    "platform": "Darwin arm64"
+  },
+  "figures": {
+    "01_part_distribution.png": {
+      "png_sha256": "3e14b0c7a603f924678a887cb0a6c47477252e75bc013c42e85ccefdd8589d62",
+      "sources": {
+        "data/reports/01_eda.json": "52a766af3d0da338a6489bdb498965952973cb58a6e2393455e923f737394460"
+      }
+    },
+    "02_variant_breakdown.png": {
+      "png_sha256": "c6aa6d762af4c9a86b4cbf5be9edebc2bdd959f816e01eb3aa1e68dd0386ab5b",
+      "sources": {
+        "data/reports/01_eda.json": "52a766af3d0da338a6489bdb498965952973cb58a6e2393455e923f737394460"
+      }
+    },
+    "03_retile_feasibility.png": {
+      "png_sha256": "42c2e05a56d68acc1e25b5fadc595ee5caa373257c169266a47f765ba4ff923e",
+      "sources": {
+        "data/reports/02_retile.json": "64ca86596143b34b658ea5e616b674d01fadd9322efdeb0837e387b5abec813a"
+      }
+    },
+    "04_stagger_ablation.png": {
+      "png_sha256": "0b88d128bc5fdd0556170f69c8dd2dac188bb1535fc3f02ddf038a0e125fae01",
+      "sources": {
+        "data/reports/09_stagger_ablation.json": "6256a0c15e711d74a24b9c520e32b73a92e6d415645957fd79e85ccfe447ecff"
+      }
+    }
+  },
+  "generator": {
+    "path": "scripts/73_figures.py",
+    "sha256": "38bc63aaa0b4789faf0b051ffa83ade097c99bbb4e59aa46c2e33de35cdbc931"
+  },
+  "kind": "brickagain.figures",
+  "note": "Written by scripts/73_figures.py beside the PNGs. --check compares it to the script, the reports and the committed PNGs without drawing, so it answers the same on any machine; PNG bytes are only reproducible where drawn_with says they were drawn."
+}

@@ -65,9 +65,11 @@ jobs:
 
       # Figures are generated from the JSON reports in data/reports/ and are
       # committed. If a report changes and nobody regenerates, the figures in
-      # the README describe an older run -- so the build says so.
+      # the README describe an older run -- so the build says so. It asks
+      # reports/figures/figures.json instead of drawing again: PNG bytes are
+      # reproducible on the machine that drew them and not across platforms,
+      # and redrawing here failed four figures whose reports had not moved.
       - name: Figures are current
         run: |
-          python scripts/73_figures.py
-          git diff --exit-code -- reports/figures \
+          python scripts/73_figures.py --check \
             || { echo "::error::reports/figures/ is stale; run 'make figures'"; exit 1; }

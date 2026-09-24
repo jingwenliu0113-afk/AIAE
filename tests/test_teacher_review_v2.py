@@ -35,6 +35,22 @@ def builder():
     return module
 
 
+def test_evidence_pdf_renders_new_date_and_markdown_cleanly(tool, tmp_path):
+    # Through the `tool` fixture below, not builder() directly: presentation/
+    # is not published, and loading the builder in a public checkout raised
+    # FileNotFoundError instead of skipping like every other test here.
+    output = tmp_path / "evidence.pdf"
+    tool.markdown_pdf(
+        "# Heading\n\n## Section\n\n### Detail\n\n**0.0%** result\n\n"
+        "> 254 photos\n", output, "Evidence", "2026-09-24")
+    from pypdf import PdfReader
+    text = "\n".join(page.extract_text() for page in PdfReader(output).pages)
+    assert "2026-09-24" in text
+    assert "2026-09-10" not in text
+    assert "Detail" in text and "254 photos" in text
+    assert "**" not in text and "###" not in text and "> 254" not in text
+
+
 @pytest.fixture(scope="module")
 def tool():
     if not BUILDER.is_file():

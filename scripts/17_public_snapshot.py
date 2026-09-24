@@ -183,8 +183,12 @@ PUBLIC_ALLOW: tuple[str, ...] = (
     "notebooks/*.ipynb",
 
     # Regenerated from data/reports/*.json by scripts/73_figures.py, and the
-    # CI job fails if a report moved and the figure did not.
+    # CI job fails if a report moved and the figure did not. figures.json is
+    # what that job reads: the digests of the generator, of each report a
+    # figure read, and of each PNG, so the answer does not depend on whether
+    # the runner can reproduce the PNG bytes.
     "reports/figures/*.png",
+    "reports/figures/figures.json",
 
     "BRICKAGAIN_PROJECT_WORKFLOW.md",
     "SHOWCASE.md",
