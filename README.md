@@ -1,11 +1,24 @@
 # BrickAgain
 
-目前的本機產品以 **BrickNet 真實零件**為核心，提供剩餘積木庫存、既有作品推薦、
-新作品生成、互動模型與接點組裝導覽。本機完整流程已實測，功能與限制見
-私人工作樹的 `src/bricknet_ext/app/ACCEPTANCE.md`；以下歷史研究結果不是新產品的成效證明。
+> **本專案已於 2026-09-30 封存。** 開發已經結束，這個 repository 不再更新，
+> 也不再處理 issue 與 pull request。私人研究樹（含 BrickNet 產品模組、資料與權重）
+> 不公開，由作者私下保存：BrickNet 資料集隨下載沒有附授權條文，無法證明有再散布的權利，
+> 所以那條研究線整體維持私人研究，由它衍生的資料、權重與樣本都不在這裡。
+> 這裡保留的是舊核心（8 種長方體積木）的研究程式、測試與彙總報告；
+> 裝好 `requirements.txt` 後，測試與不需要模型的示範在全新 clone 上就能執行。
+>
+> **Archived on 2026-09-30.** Development has ended. This repository is no
+> longer updated, and issues and pull requests are not handled. The private
+> research tree, including the BrickNet product modules, data and weights, is
+> kept privately by the author and is not published. What remains here is the
+> eight-part research track with its tests and aggregate reports; after
+> installing `requirements.txt`, the tests and the model-free demonstration run
+> in a fresh checkout.
 
-本機入口：`./.venv/bin/python scripts/68_bricknet_ui.py`。
-完整操作與依賴說明在私人工作樹的 `src/bricknet_ext/app/README.md`。
+封存時的本機產品以 **BrickNet 真實零件**為核心，提供剩餘積木庫存、既有作品推薦、
+新作品生成、互動模型與接點組裝導覽。完整流程只在作者的 Mac 上實測過；
+驗收紀錄、操作與依賴說明，以及產品入口 `scripts/68_bricknet_ui.py`，都在私人研究樹裡，
+不在這個 repository。以下歷史研究結果不是新產品的成效證明。
 公開研究快照不包含 BrickNet 資料、權重與產品模組，因此不能只下載公開快照就啟動產品。
 
 ## Archived research track — eight rectangular parts
@@ -16,7 +29,7 @@ This historical track uses eight rectangular parts from StableText2Brick and
 combines deterministic data preparation, CP-SAT re-tiling, inventory-gated
 decoding, LoRA training utilities, evaluation, and LDraw export.
 
-> 這是尚在進行中的研究原型。目前公開的重點是可審查的程式、測試與實驗紀錄，
+> 這是已封存的研究原型。公開的重點是可審查的程式、測試與實驗紀錄，
 > 不代表完整的最終產品或已完成的學術結論。
 
 BrickAgain is an independent research project and is not affiliated with or
@@ -160,13 +173,11 @@ UIs are archived research implementation over the eight-part core, and their
 boundaries are documented in [UI.md](UI.md). They are not product entry points:
 `scripts/35_full_ui.py` refuses by name and exits non-zero, while
 `scripts/29_ui.py` still runs and is kept only for evidence replay.
-Use `scripts/68_bricknet_ui.py` for the current BrickNet product; see the
-current product guide `src/bricknet_ext/app/README.md` (private product tree) and
-local installation scope `src/bricknet_ext/app/INSTALLATION.md` (private product tree).
+The BrickNet product that replaced them (`scripts/68_bricknet_ui.py`), its
+product guide, its installation scope and its dependency notices are in the
+private research tree and are not part of this repository.
 Historical transport and research code stays available for evidence replay.
-Current product dependency notices are in the private product supplement
-`src/bricknet_ext/app/THIRD_PARTY_NOTICES.md`; the root notice remains the
-historical evidence version.
+The root notice remains the historical evidence version.
 
 ## Image recognition, retrieval, colour and build steps
 
@@ -344,9 +355,10 @@ data, model derivatives, or generated artifacts.
 
 ## Contributing and security
 
-Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md). Please report
-security issues using the process in [SECURITY.md](SECURITY.md), not a public
-issue containing exploit details or credentials.
+The repository is archived, so contributions are no longer accepted.
+[CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) are kept as
+the rules that applied while it was active. Do not open a public issue
+containing exploit details or credentials.
 
 ## License
 
