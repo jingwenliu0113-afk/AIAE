@@ -36,9 +36,11 @@ SOURCE_BINDING = PHASE3C_DIR / "source_binding_v2.json"
 # different one -- so a later change to a declared drifting file gets a new
 # receipt rather than an edit to the old one. v2 stays on disk: it recorded
 # what was true then, and nothing about it became wrong. v3 followed the
-# delivery files; v4 follows reports/figures/figures.json, the manifest CI
-# reads instead of redrawing. v2 and v3 both stay.
-LIVE_DRIFT = PHASE3C_DIR / "live_drift_v4.json"
+# delivery files; v4 followed reports/figures/figures.json, the manifest CI
+# reads instead of redrawing; v5 follows the personal-path scan, which now
+# also catches a Windows home path written with doubled backslashes. v2, v3
+# and v4 all stay.
+LIVE_DRIFT = PHASE3C_DIR / "live_drift_v5.json"
 POSTSCORE_SEAL = Path("data/reports/bricknet/42_postscore_seal_v1.json")
 
 PARENT_SEAL = Path("artifacts/bricknet/evidence_v5/outputs/seal.json")
@@ -91,8 +93,11 @@ DRIFT_REASONS = {
         "The live public-snapshot allowlist has grown since gen09 was packed: "
         "the V1 generation ledger, then the delivery files (MODEL_CARD.md, "
         "Makefile, pyproject.toml, the CI workflow, configs/, notebooks/, "
-        "reports/figures/), then reports/figures/figures.json. That file is "
-        "not in Phase 3C gen09's 26-file execution closure."
+        "reports/figures/), then reports/figures/figures.json. Its approval "
+        "table has gained reviewed synthetic fixtures, and its personal-path "
+        "rule now also matches a Windows home path written with doubled "
+        "backslashes, as JSON and ordinary Python string literals write it. "
+        "This module is not in Phase 3C gen09's 26-file execution closure."
     ),
     "src/eval/visual_stress.py": (
         "The live V1 generation declaration later moved from code to "

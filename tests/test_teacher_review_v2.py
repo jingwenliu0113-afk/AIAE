@@ -1,9 +1,11 @@
 """M5-1: v2 is built beside v1, never over it.
 
-v1 was handed to a teacher on 2026-09-10. Its directory still verifies against
-its own SHA256SUMS.txt, and the archive is what was actually sent, so every
-test here is written on the assumption that both are evidence rather than
-working files.
+v1 was built for a teacher on 2026-09-10. It was never sent -- as of
+2026-09-26 no package has gone to the teacher; an earlier version of this
+docstring said otherwise, and was wrong. It is frozen all the same: an issued
+version is evidence of what was built, not a working file. Its directory still
+verifies against its own SHA256SUMS.txt, and every test here treats both it and
+its archive as evidence.
 
 The reproducibility proof is the positive one: two builds into two temporary
 directories have to agree file for file. That replaces "rebuild v1 and compare",
@@ -241,6 +243,17 @@ def test_a_model_weight_in_the_package_is_refused(tool, slides, tmp_path,
 
 def test_an_absolute_home_path_in_the_package_is_refused(tool, slides, tmp_path,
                                                          monkeypatch):
+    """And every other kind of private detail the scan names.
+
+    Until v11 this planted only a macOS home path, the one alternative that
+    worked. The email, IPv4 and Windows patterns doubled their backslashes
+    inside raw strings and matched nothing, and this test passed all the same.
+    So each pattern now meets a leak it exists to stop, planted in a built
+    package and put through both scans that use the patterns.
+
+    The leaks are the builder's PRIVATE_EXAMPLES, not literals here: this file
+    is published, and presentation/ is not.
+    """
     out, _ = build(tool, slides, tmp_path, "v2", monkeypatch)
     monkeypatch.setattr(tool, "OUT", out)
     tool.privacy_scan()                      # clean as built
@@ -248,6 +261,41 @@ def test_an_absolute_home_path_in_the_package_is_refused(tool, slides, tmp_path,
         '# see /Users/someone/Desktop/private\n', encoding="utf-8")
     with pytest.raises(ValueError, match="privacy scan failed"):
         tool.privacy_scan()
+    (out / "source_samples" / "leak.py").unlink()
+
+    leaks = tool.PRIVATE_EXAMPLES
+    assert set(leaks) == set(tool.PRIVATE_PATTERNS)
+    for label, examples in leaks.items():
+        assert examples, label
+        for example in examples:
+            # JSON doubles a backslash, and the scan reads JSON as written.
+            for form in (example, json.dumps(example, ensure_ascii=False)):
+                assert tool.PRIVATE_PATTERNS[label].search(form), (label, form)
+    # Text the packages do carry must not trip them.
+    for benign in ("@pytest.fixture", "R@1 is 49.9%", "8.8.8.8", "110.1.2.3",
+                   "Windows 10.0.26100", "icons/Users.svg"):
+        assert [label for label, pattern in tool.PRIVATE_PATTERNS.items()
+                if pattern.search(benign)] == [], benign
+    # verify_privacy is the scan v9 onwards run, and it also reads .json.
+    monkeypatch.syspath_prepend(str(BUILDER.parent))
+    import build_teacher_review_v9 as later
+    later.verify_privacy(out)                # clean as built
+    leak = out / "source_samples" / "leak.md"
+    record = out / "leak.json"
+    for label, examples in leaks.items():
+        for example in examples:
+            leak.write_text(f"see {example}\n", encoding="utf-8")
+            with pytest.raises(ValueError, match=label):
+                tool.privacy_scan()
+            with pytest.raises(ValueError, match=label):
+                later.verify_privacy(out)
+            leak.unlink()
+            record.write_text(json.dumps({"value": example}, ensure_ascii=False),
+                              encoding="utf-8")
+            with pytest.raises(ValueError, match=label):
+                later.verify_privacy(out)
+            record.unlink()
+
     # Every file the photo track contributes is screened, so a sample added
     # later that carries one of these patterns fails here and not at build.
     for source in tool.PHOTO_COPIES.values():

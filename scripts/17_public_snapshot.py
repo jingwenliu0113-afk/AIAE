@@ -452,10 +452,17 @@ APPROVED_HITS: dict[str, dict[str, int]] = {
         'personal-path|190b1e33aa09e964': 1,
         'personal-path|298f55db1d1b1f23': 1,
         'personal-path|2d47a09e17242cbc': 1,
+        # The Windows prefix in the assertion that no marker survives
+        # redaction, as the source spells it: an ordinary string literal
+        # doubles each backslash. A bare prefix; it names no one.
+        'personal-path|309e5fa0afe8051d': 1,
         'personal-path|3b122b9d4638c4dd': 4,
         'personal-path|411a8d1af1f5c783': 1,
         'personal-path|4491e4c3e7fe9be6': 2,
         'personal-path|46dc943e3424a225': 4,
+        # The Windows entry of SYNTHETIC_PATHS, under the fictional
+        # `someone`, as the source spells it with each backslash doubled.
+        'personal-path|5900befffd4c6f43': 1,
         'personal-path|5c2406d3c1e5548a': 1,
         'personal-path|60dabd422c5ee707': 1,
         'personal-path|7e76815d9b778c02': 1,
@@ -501,8 +508,8 @@ APPROVED_HITS: dict[str, dict[str, int]] = {
     # synthetic fixtures only, and each one is the thing under test: fixed
     # AAAABBBB literals shaped like a provider token and an organization id, an
     # RFC 6761 reserved domain, one invented instant asserting that
-    # precise-timestamp is deliberately *not* a pack scan kind, and one
-    # invented path under a fictional `someone`. No real credential appears in this file, and the
+    # precise-timestamp is deliberately *not* a pack scan kind, and two
+    # invented paths under a fictional `someone`. No real credential appears in this file, and the
     # tests that use these assert they are refused rather than published.
     'tests/test_pack.py': {
         'credential|77f1b036a294fc1a': 2,
@@ -511,6 +518,10 @@ APPROVED_HITS: dict[str, dict[str, int]] = {
         'email|8280602002e22b1e': 1,
         'organization-id|f8b5a28bf7a01091': 1,
         'personal-path|890701bc01cc8964': 1,
+        # The Windows shape path_problems must refuse, under the same
+        # fictional `someone`, as the source spells it with each backslash
+        # doubled.
+        'personal-path|64851914f56bb13a': 1,
     },
     # invented timestamps in gate and journal fixtures.
     'tests/test_mps_order.py': {
@@ -562,9 +573,13 @@ SCANS: tuple[tuple[str, str], ...] = (
     # The prefix *and* everything after it. Matching only the prefix meant
     # `/Users/` and `/Users/someone/private.txt` were the same finding, so
     # approving a mention of the prefix approved every real path under it.
+    # The Windows prefix takes one backslash or two. Windows writes one; a
+    # JSON file, or an ordinary Python string literal, doubles every one, and
+    # asking for exactly one let a home path from the GPU node through in any
+    # report or receipt that recorded it.
     ("personal-path",
-     r"(?:[A-Za-z]:\\Users\\|/Users/|/home/|/root/|/private/|/Volumes/"
-     r"|/var/folders/|/mnt/|/media/|/srv/|/tmp/)"
+     r"(?:[A-Za-z]:\\{1,2}Users\\{1,2}|/Users/|/home/|/root/|/private/"
+     r"|/Volumes/|/var/folders/|/mnt/|/media/|/srv/|/tmp/)"
      r"[^\s\"'`<>|,)\]}]*"),
 
     # Machine and process identity.
